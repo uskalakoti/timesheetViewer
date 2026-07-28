@@ -512,6 +512,30 @@ public class AdminController {
     }
 
 
+    //download template
+    @GetMapping("/leave-planner/template")
+    public ResponseEntity<Resource> downloadLeavePlannerTemplate() throws IOException {
+
+        Resource resource =
+                new ClassPathResource("downloads/LeavePlannerTemplate.xlsx");
+
+        if (!resource.exists()) {
+            throw new RuntimeException("Leave Planner template not found.");
+        }
+
+        return ResponseEntity.ok()
+                .header(
+                        HttpHeaders.CONTENT_DISPOSITION,
+                        "attachment; filename=LeavePlannerTemplate.xlsx"
+                )
+                .contentType(
+                        MediaType.parseMediaType(
+                                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                        )
+                )
+                .contentLength(resource.contentLength())
+                .body(resource);
+    }
 
 
     // ══════════════════════════════════════════════════════════════════════════

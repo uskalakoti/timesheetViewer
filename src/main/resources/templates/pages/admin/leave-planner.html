@@ -1,156 +1,3 @@
-<!--<!DOCTYPE html>-->
-<!--<html xmlns:th="http://www.thymeleaf.org" lang="en">-->
-
-<!--<head th:replace="fragments/layout :: head('Leave Planner')"></head>-->
-
-<!--<body>-->
-
-<!--<nav th:replace="fragments/layout :: navbar"></nav>-->
-
-<!--<main class="main-content">-->
-
-<!--    &lt;!&ndash; ===================================================== &ndash;&gt;-->
-<!--    &lt;!&ndash; Page Header &ndash;&gt;-->
-<!--    &lt;!&ndash; ===================================================== &ndash;&gt;-->
-
-<!--    <div class="page-header">-->
-
-<!--        <div>-->
-
-<!--            <h1>-->
-<!--                <i class="fa fa-calendar-check"></i>-->
-<!--                Leave Planner-->
-<!--            </h1>-->
-
-<!--            <p class="subtitle">-->
-<!--                Upload and manage employee leaves planner.-->
-<!--            </p>-->
-
-<!--        </div>-->
-
-<!--    </div>-->
-
-
-<!--    &lt;!&ndash; Success Message &ndash;&gt;-->
-<!--    <div th:if="${success}" class="alert alert-success">-->
-<!--        <i class="fa fa-circle-check"></i>-->
-<!--        <span th:text="${success}"></span>-->
-<!--    </div>-->
-
-<!--    &lt;!&ndash; Error Message &ndash;&gt;-->
-<!--    <div th:if="${error}" class="alert alert-danger">-->
-<!--        <i class="fa fa-circle-xmark"></i>-->
-<!--        <span th:text="${error}"></span>-->
-<!--    </div>-->
-
-<!--    &lt;!&ndash; ===================================================== &ndash;&gt;-->
-<!--    &lt;!&ndash; Empty State &ndash;&gt;-->
-<!--    &lt;!&ndash; ===================================================== &ndash;&gt;-->
-
-<!--    <div th:if="${!plannerUploaded}" class="leave-empty-state">-->
-
-<!--        <div class="leave-empty-icon">-->
-
-<!--            <i class="fa fa-file-excel"></i>-->
-
-<!--        </div>-->
-
-<!--        <h2>No Leave Planner Uploaded Yet</h2>-->
-
-<!--        <p>-->
-
-<!--            Upload the employee leaves planner to get started.-->
-
-<!--        </p>-->
-
-<!--        <div class="leave-empty-actions">-->
-
-<!--&lt;!&ndash;            <button class="btn btn-secondary">&ndash;&gt;-->
-
-
-<!--            <a th:href="@{/admin/leave-planner/template}"-->
-<!--               class="btn btn-secondary">-->
-<!--                <i class="fa fa-download"></i>-->
-<!--                Download Template-->
-<!--            </a>-->
-
-
-<!--&lt;!&ndash;                <i class="fa fa-download"></i>&ndash;&gt;-->
-
-<!--&lt;!&ndash;                Download Template&ndash;&gt;-->
-
-<!--            </button>-->
-
-<!--&lt;!&ndash;            <button class="btn btn-primary">&ndash;&gt;-->
-
-<!--&lt;!&ndash;                <i class="fa fa-upload"></i>&ndash;&gt;-->
-
-<!--&lt;!&ndash;                Upload Leave Planner&ndash;&gt;-->
-
-<!--&lt;!&ndash;            </button>&ndash;&gt;-->
-
-<!--            <form th:action="@{/admin/leave-planner/upload}"-->
-<!--                  method="post"-->
-<!--                  enctype="multipart/form-data"-->
-<!--                  id="uploadForm">-->
-
-<!--                <input-->
-<!--                        type="file"-->
-<!--                        id="leavePlannerFile"-->
-<!--                        name="file"-->
-<!--                        accept=".xlsx"-->
-<!--                        style="display:none"-->
-<!--                        onchange="document.getElementById('uploadForm').submit()"/>-->
-
-<!--                <button-->
-<!--                        type="button"-->
-<!--                        class="btn btn-primary"-->
-<!--                        onclick="document.getElementById('leavePlannerFile').click()">-->
-
-<!--                    <i class="fa fa-upload"></i>-->
-<!--                    Upload Leave Planner-->
-
-<!--                </button>-->
-
-<!--            </form>-->
-
-<!--        </div>-->
-
-<!--        <div class="leave-template-info">-->
-
-<!--            <h5>-->
-
-<!--                <i class="fa fa-circle-info"></i>-->
-
-<!--                Template Information-->
-
-<!--            </h5>-->
-
-<!--            <ul>-->
-
-<!--                <li>Excel file (.xlsx) only</li>-->
-
-<!--                <li>Employee Name and Team columns are mandatory</li>-->
-
-<!--            </ul>-->
-
-<!--        </div>-->
-
-<!--    </div>-->
-
-<!--</main>-->
-
-<!--<footer th:replace="fragments/layout :: footer"></footer>-->
-
-<!--<script th:src="@{/js/app.js}"></script>-->
-
-<!--</body>-->
-
-<!--</html>-->
-
-
-
-
 <!DOCTYPE html>
 <html xmlns:th="http://www.thymeleaf.org" lang="en">
 
@@ -223,7 +70,8 @@
          ACTION SECTION
          ================================================================ -->
 
-    <div class="card">
+    <div th:if="${plannerUploaded}"
+         class="card">
 
         <div class="card-body">
 
@@ -240,22 +88,22 @@
 
 
                 <!-- Upload Leave Planner -->
-                <form th:action="@{/admin/leave-planner/upload}"
-                      method="post"
-                      enctype="multipart/form-data"
-                      style="display:inline;">
+<!--                <form th:action="@{/admin/leave-planner/upload}"-->
+<!--                      method="post"-->
+<!--                      enctype="multipart/form-data"-->
+<!--                      style="display:inline;">-->
 
-                    <!--
-                        Hidden file input.
+<!--                    &lt;!&ndash;-->
+<!--                        Hidden file input.-->
 
-                        JavaScript will trigger this input when
-                        the Upload Leave Planner button is clicked.
-                    -->
-                    <input type="file"
-                           id="leavePlannerFile"
-                           name="file"
-                           accept=".xlsx"
-                           style="display:none;"/>
+<!--                        JavaScript will trigger this input when-->
+<!--                        the Upload Leave Planner button is clicked.-->
+<!--                    &ndash;&gt;-->
+<!--                    <input type="file"-->
+<!--                           id="leavePlannerFile"-->
+<!--                           name="file"-->
+<!--                           accept=".xlsx"-->
+<!--                           style="display:none;"/>-->
 
 
                     <button type="button"
@@ -267,7 +115,7 @@
 
                     </button>
 
-                </form>
+<!--                </form>-->
 
             </div>
 
@@ -281,47 +129,108 @@
          Displayed when no Leave Planner has been uploaded.
          ================================================================ -->
 
+
     <div th:if="${!plannerUploaded}"
          class="card mt-4">
 
-        <div class="card-body empty-state">
+        <div class="card-body lp-empty">
 
-            <div class="empty-state-icon">
+            <div class="lp-empty-icon">
+
                 <i class="fa fa-file-excel"></i>
+
             </div>
 
-            <h2>
-                No Leave Planner Uploaded Yet
-            </h2>
+            <h2>No Leave Planner Uploaded Yet</h2>
 
             <p>
                 Upload the employee leaves planner to get started.
             </p>
 
-            <div class="page-actions">
+            <div class="lp-empty-actions">
 
                 <a th:href="@{/admin/leave-planner/template}"
-                   class="btn btn-secondary">
+                   class="btn btn-outline-primary lp-download-btn">
 
                     <i class="fa fa-download"></i>
+
                     Download Template
 
                 </a>
 
-                <button type="button"
-                        class="btn btn-primary"
-                        onclick="document.getElementById('leavePlannerFile').click();">
+<!--                <button type="button"-->
+<!--                        class="btn btn-primary lp-upload-btn"-->
+<!--                        onclick="document.getElementById('leavePlannerFile').click()">-->
 
-                    <i class="fa fa-upload"></i>
-                    Upload Leave Planner
+<!--                    <i class="fa fa-upload"></i>-->
 
-                </button>
+<!--                    Upload Leave Planner-->
+
+<!--                </button>-->
+
+
+<!--                <form th:action="@{/admin/leave-planner/upload}"-->
+<!--                      method="post"-->
+<!--                      enctype="multipart/form-data"-->
+<!--                      style="display:inline;">-->
+
+<!--                    <input-->
+<!--                            type="file"-->
+<!--                            id="leavePlannerFile"-->
+<!--                            name="file"-->
+<!--                            accept=".xlsx"-->
+<!--                            style="display:none;"/>-->
+
+                    <button
+                            type="button"
+                            class="btn btn-primary lp-upload-btn"
+                            onclick="document.getElementById('leavePlannerFile').click()">
+
+                        <i class="fa fa-upload"></i>
+
+                        Upload Leave Planner
+
+                    </button>
+
+<!--                </form>-->
+
+
+            </div>
+
+            <div class="lp-template-info">
+
+                <h5>
+
+                    <i class="fa fa-circle-info"></i>
+
+                    Template Information
+
+                </h5>
+
+<!--                <ul>-->
+
+<!--                    <li>Excel file (.xlsx) only</li>-->
+
+<!--                    <li>Employee Name and Team columns are mandatory</li>-->
+
+<!--                </ul>-->
+
+                <div class="lp-template-row">
+                    <i class="fa fa-circle-check"></i>
+                    Excel file (.xlsx) only
+                </div>
+
+                <div class="lp-template-row">
+                    <i class="fa fa-circle-check"></i>
+                    Employee Name and Team columns are mandatory
+                </div>
 
             </div>
 
         </div>
 
     </div>
+
 
 
     <!-- ================================================================
@@ -350,24 +259,6 @@
             <!-- ===========================================================
                  Sheet Tabs
                  =========================================================== -->
-
-<!--            <div class="sheet-tabs-wrapper">-->
-
-<!--                <div class="sheet-tabs" id="leavePlannerTabs">-->
-
-<!--                    <button-->
-<!--                            th:each="meta, stat : ${sheetMetas}"-->
-<!--                            type="button"-->
-<!--                            class="sheet-tab"-->
-<!--                            th:classappend="${stat.index == activeTab} ? ' active' : ''"-->
-<!--                            th:text="${meta.sheetName}"-->
-<!--                            th:attr="data-index=${stat.index}">-->
-
-<!--                    </button>-->
-
-<!--                </div>-->
-
-<!--            </div>-->
 
             <div class="sheet-tabs">
 
@@ -412,30 +303,21 @@
          This section remains visible before and after upload.
          ================================================================ -->
 
-    <div class="card mt-4">
 
-        <div class="card-body">
+    <form id="leavePlannerUploadForm"
+          th:action="@{/admin/leave-planner/upload}"
+          method="post"
+          enctype="multipart/form-data"
+          style="display:none;">
 
-            <h2>
-                <i class="fa fa-circle-info"></i>
-                Template Information
-            </h2>
+        <input
+                type="file"
+                id="leavePlannerFile"
+                name="file"
+                accept=".xlsx"/>
 
-            <ul>
+    </form>
 
-                <li>
-                    Excel file (.xlsx) only
-                </li>
-
-                <li>
-                    Employee Name and Team columns are mandatory
-                </li>
-
-            </ul>
-
-        </div>
-
-    </div>
 
 </main>
 
@@ -450,67 +332,7 @@
      LEAVE PLANNER SHEET TAB HANDLING
      ================================================================ -->
 
-<!--<script>-->
 
-<!--    document.addEventListener("DOMContentLoaded", function () {-->
-
-<!--        const tabs =-->
-<!--            document.querySelectorAll(".sheet-tab");-->
-
-<!--        const sheets =-->
-<!--            document.querySelectorAll(".sheet-content");-->
-
-
-<!--        tabs.forEach(function (tab) {-->
-
-<!--            tab.addEventListener("click", function () {-->
-
-<!--                const selectedIndex =-->
-<!--                    this.getAttribute("data-sheet-index");-->
-
-
-<!--                /*-->
-<!--                 * Remove active state from all tabs.-->
-<!--                 */-->
-<!--                tabs.forEach(function (item) {-->
-<!--                    item.classList.remove("active");-->
-<!--                });-->
-
-
-<!--                /*-->
-<!--                 * Hide all sheets.-->
-<!--                 */-->
-<!--                sheets.forEach(function (sheet) {-->
-<!--                    sheet.classList.remove("active");-->
-<!--                });-->
-
-
-<!--                /*-->
-<!--                 * Activate selected tab.-->
-<!--                 */-->
-<!--                this.classList.add("active");-->
-
-
-<!--                /*-->
-<!--                 * Display selected worksheet.-->
-<!--                 */-->
-<!--                const selectedSheet =-->
-<!--                    document.getElementById(-->
-<!--                        "sheet-" + selectedIndex-->
-<!--                    );-->
-
-
-<!--                if (selectedSheet) {-->
-<!--                    selectedSheet.classList.add("active");-->
-<!--                }-->
-
-<!--            });-->
-
-<!--        });-->
-
-<!--    });-->
-
-<!--</script>-->
 
 <script>
 
