@@ -4189,6 +4189,100 @@ private void validateSubProjects(
             }
         }
 
+        // =========================================
+        // CM-07: Actual Value vs Total Billable Amount Validation
+        // =========================================
+        log.info("CM-07: Comparing Actual Value against Total Billable Amount");
+
+        if (summaryCells != null && !summaryCells.isEmpty()) {
+            // The true Total Billable Amount is derived from the Summary sheet
+            // (what the current reporting month should actually be billed).
+            double summaryTotalAmount = 0;
+            TreeMap<Integer, Map<Integer, CellData>> summaryRowMap = new TreeMap<>();
+            for (CellData c : summaryCells) {
+                summaryRowMap.computeIfAbsent(c.getRowIdx(), k -> new TreeMap<>()).put(c.getColIdx(), c);
+            }
+            int sFirstKey = summaryRowMap.firstKey();
+            int sLastKey = summaryRowMap.lastKey();
+            int sDataStart = sFirstKey + 2;
+
+            for (Map.Entry<Integer, Map<Integer, CellData>> entry : summaryRowMap.entrySet()) {
+                int rowIdx = entry.getKey();
+                if (rowIdx < sDataStart) continue;
+                if (rowIdx == sLastKey) continue;
+                Map<Integer, CellData> cols = entry.getValue();
+                String amountStr = val(cols, 10);
+                if (!amountStr.isBlank()) {
+                    try {
+                        summaryTotalAmount += Double.parseDouble(amountStr.trim().replaceAll("[,$]", ""));
+                    } catch (NumberFormatException ignored) {}
+                }
+            }
+
+            if (summaryTotalAmount > 0) {
+                // The reporting month is the Commercial header month (row 5, col 1).
+                String reportingMonth = "";
+                Map<Integer, CellData> monthRow = commercialRowMap.get(5);
+                if (monthRow != null && monthRow.get(1) != null) {
+                    String raw = monthRow.get(1).getRawValue();
+                    if (raw != null && raw.length() >= 7) reportingMonth = raw.substring(0, 7);
+                }
+
+                // Locate the invoicing row matching the reporting month.
+                int matchedRow = -1;
+                String actualStr = "";
+                for (Map.Entry<Integer, Map<Integer, CellData>> entry : commercialRowMap.entrySet()) {
+                    int rowIdx = entry.getKey();
+                    if (rowIdx < 17) continue; // invoicing data rows
+                    Map<Integer, CellData> cols = entry.getValue();
+                    CellData monthCell = cols.get(0);
+                    boolean matches = false;
+                    if (!reportingMonth.isBlank() && monthCell != null && monthCell.getRawValue() != null
+                            && monthCell.getRawValue().length() >= 7) {
+                        matches = monthCell.getRawValue().substring(0, 7).equals(reportingMonth);
+                    }
+                    if (matches) {
+                        matchedRow = rowIdx;
+                        actualStr = val(cols, 2);
+                        break;
+                    }
+                }
+
+                // Fallback: top-most invoicing data row with a non-blank Actual Value
+                // (used when the reporting month cannot be matched explicitly).
+                if (matchedRow < 0) {
+                    for (Map.Entry<Integer, Map<Integer, CellData>> entry : commercialRowMap.entrySet()) {
+                        int rowIdx = entry.getKey();
+                        if (rowIdx < 17) continue;
+                        Map<Integer, CellData> cols = entry.getValue();
+                        String monthStr = val(cols, 0);
+                        if (monthStr.isBlank()) continue; // skip blank/header-like rows
+                        String a = val(cols, 2);
+                        if (!a.isBlank()) {
+                            matchedRow = rowIdx;
+                            actualStr = a;
+                            break;
+                        }
+                    }
+                }
+
+                if (matchedRow >= 0 && !actualStr.isBlank()) {
+                    try {
+                        double actualValue = Double.parseDouble(actualStr.trim().replaceAll("[,$]", ""));
+                        if (Math.abs(actualValue - summaryTotalAmount) > 0.01) {
+                            issues.add(commercialIssue(
+                                    sessionId, "CM-07", "CRITICAL", matchedRow, 2, "Actual Value",
+                                    String.format("Actual Value does not match Total Billable amount. " +
+                                            "Expected %.2f (Total Billable Amount), found %.2f.",
+                                            summaryTotalAmount, actualValue)));
+                        }
+                    } catch (NumberFormatException e) {
+                        log.warn("CM-07: Could not parse Actual Value '{}'", actualStr);
+                    }
+                }
+            }
+        }
+
         log.info("Commercial Validation completed.");
     }
 

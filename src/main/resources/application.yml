@@ -208,6 +208,14 @@ app:
         always-on: true
         sort-order: 31
 
+      - rule-id: CM-07
+        sheet: Commercial
+        description: "Actual Value vs Total Billable Amount Validation"
+        severity: CRITICAL
+        enabled: true
+        always-on: true
+        sort-order: 32
+
   master:
 
     default-working-hours-per-day: 8.0
