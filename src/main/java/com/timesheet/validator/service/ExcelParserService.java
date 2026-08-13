@@ -1,9 +1,14 @@
 package com.timesheet.validator.service;
 
+import java.math.BigDecimal;
+import java.util.LinkedHashMap;
+import java.util.Map;
 import com.timesheet.validator.domain.CellData;
 import com.timesheet.validator.domain.SheetMeta;
 import com.timesheet.validator.domain.UploadSession;
 import com.timesheet.validator.dto.MergedRegionDto;
+import com.timesheet.validator.dto.ResourceImportDto;
+import com.timesheet.validator.dto.SowImportDto;
 import com.timesheet.validator.repository.CellDataRepository;
 import com.timesheet.validator.repository.SheetMetaRepository;
 import com.timesheet.validator.repository.UploadSessionRepository;
@@ -479,6 +484,279 @@ public class ExcelParserService {
         return sessionId;
     }
 
+
+    /**
+     * Parses the Resource Master workbook.
+     */
+    /**
+     * Parses the Resource Master workbook and returns the extracted
+     * employee data as ResourceImportDto objects.
+     */
+    public List<ResourceImportDto> parseResourceWorkbook(
+            MultipartFile file) throws Exception {
+
+        log.info("[Master Import] Parsing Resource workbook: {}",
+                file.getOriginalFilename());
+
+        List<ResourceImportDto> resources = new ArrayList<>();
+
+        try (InputStream is = file.getInputStream();
+             Workbook workbook = new XSSFWorkbook(is)) {
+
+            // Locate the required sheet
+            Sheet sheet = findResourceSheet(workbook);
+
+            // Build header map
+            Map<String, Integer> headerMap = buildHeaderMap(sheet);
+
+            // Iterate over all data rows (skip header)
+            for (int rowIndex = sheet.getFirstRowNum() + 1;
+                 rowIndex <= sheet.getLastRowNum();
+                 rowIndex++) {
+
+                Row row = sheet.getRow(rowIndex);
+
+                if (row == null) {
+                    continue;
+                }
+
+                // Employee ID is our business key
+                String employeeId = getCellValue(row, headerMap, "Employee Id", "Employee ID", "Emp ID");
+
+                // Skip blank / summary rows
+                if (employeeId == null || employeeId.trim().isEmpty()) {
+                    continue;
+                }
+
+                ResourceImportDto dto = ResourceImportDto.builder()
+
+                        .resourceId(employeeId)
+
+                        .employeeName(
+                                getCellValue(row, headerMap, "Employee Name", "Employee", "Resource Name")
+                        )
+
+                        .location(
+                                getCellValue(row, headerMap, "Location", "Employee Location")
+                        )
+
+                        .assignedTeam(null)
+
+//                        .project(
+//                                getCellValue(row, headerMap, "SoW Name", "Project")
+//                        )
+
+                        .project(null)
+
+                        .sowDescription(
+                                getCellValue(
+                                        row,
+                                        headerMap,
+                                        "SoW Name"
+                                )
+                        )
+
+                        .sowNumber(
+                                getCellValue(row, headerMap, "SoW #", "SOW",
+                                        "SOW No",
+                                        "SOW Number")
+                        )
+
+                        .roleInSow(
+                                getCellValue(
+                                        row,
+                                        headerMap,
+                                        "Designation"
+                                )
+                        )
+
+                        .build();
+
+                resources.add(dto);
+            }
+        }
+
+        log.info("[Master Import] Parsed {} resource records.",
+                resources.size());
+
+        return resources;
+    }
+
+    /**
+     * Parses the SOW Master workbook.
+     */
+    /**
+     * Parses the SOW Master workbook and returns the extracted
+     * SOW data as SowImportDto objects.
+     */
+    public List<SowImportDto> parseSowWorkbook(
+            MultipartFile file) throws Exception {
+
+        log.info("[Master Import] Parsing SOW workbook: {}",
+                file.getOriginalFilename());
+
+        List<SowImportDto> sowList = new ArrayList<>();
+
+        try (InputStream is = file.getInputStream();
+             Workbook workbook = new XSSFWorkbook(is)) {
+
+            // Find FY-* sheet
+            Sheet sheet = findSowSheet(workbook);
+
+            // Build dynamic header map
+            Map<String, Integer> headerMap = buildHeaderMap(sheet);
+
+            // Iterate over all data rows (skip header)
+            for (int rowIndex = sheet.getFirstRowNum() + 1;
+                 rowIndex <= sheet.getLastRowNum();
+                 rowIndex++) {
+
+                Row row = sheet.getRow(rowIndex);
+
+                if (row == null) {
+                    continue;
+                }
+
+                // Business Key
+                String sowNumber = getCellValue(
+                        row,
+                        headerMap,
+                        "SOW Number",
+                        "SoW #",
+                        "SoW Number",
+                        "SOW"
+                );
+
+                // Skip blank rows
+                if (sowNumber == null || sowNumber.trim().isEmpty()) {
+                    continue;
+                }
+
+                SowImportDto dto = SowImportDto.builder()
+
+                        .project(
+                                getCellValue(
+                                        row,
+                                        headerMap,
+                                        "Project",
+                                        "Project Name"
+                                )
+                        )
+
+                        .projectLocation(
+                                getCellValue(
+                                        row,
+                                        headerMap,
+                                        "Project Location",
+                                        "Location"
+                                )
+                        )
+
+                        .sowNumber(sowNumber)
+
+                        .sowDescription(
+                                getCellValue(
+                                        row,
+                                        headerMap,
+                                        "SOW Description",
+                                        "SoW Name",
+                                        "Description"
+                                )
+                        )
+
+                        .poNumber(
+                                getCellValue(
+                                        row,
+                                        headerMap,
+                                        "PO Number",
+                                        "PO No"
+                                )
+                        )
+
+                        .updatedPoNumber(
+                                getCellValue(
+                                        row,
+                                        headerMap,
+                                        "Updated PO Number",
+                                        "Updated PO"
+                                )
+                        )
+
+                        .poValue(
+                                parseBigDecimal(
+                                        getCellValue(
+                                                row,
+                                                headerMap,
+                                                "PO Value"
+                                        )
+                                )
+                        )
+
+                        .sowStartDate(
+                                getDateValue(
+                                        row,
+                                        headerMap,
+                                        "SOW Start Date"
+                                )
+                        )
+
+                        .sowEndDate(
+                                getDateValue(
+                                        row,
+                                        headerMap,
+                                        "SOW End Date"
+                                )
+                        )
+
+//                        .poStartDate(
+//                                parseLocalDate(
+//                                        getCellValue(
+//                                                row,
+//                                                headerMap,
+//                                                "PO Start Date"
+//                                        )
+//                                )
+//                        )
+//
+//                        .poEndDate(
+//                                parseLocalDate(
+//                                        getCellValue(
+//                                                row,
+//                                                headerMap,
+//                                                "PO End Date"
+//                                        )
+//                                )
+//                        )
+
+                        .poStartDate(
+                                getDateValue(
+                                        row,
+                                        headerMap,
+                                        "PO Start Date"
+                                )
+                        )
+
+                        .poEndDate(
+                                getDateValue(
+                                        row,
+                                        headerMap,
+                                        "PO End Date"
+                                )
+                        )
+
+                        .build();
+
+                sowList.add(dto);
+            }
+        }
+
+        log.info("[Master Import] Parsed {} SOW records.",
+                sowList.size());
+
+        return sowList;
+    }
+
+
     // ── Helpers ───────────────────────────────────────────────────────────────
 
 //    private CellData buildCell(String sessionId, String sheetName, int row, int col, Cell cell,
@@ -611,6 +889,368 @@ public class ExcelParserService {
                 rgb[1] & 0xFF,
                 rgb[2] & 0xFF
         );
+    }
+
+
+    //helper methods for master data
+
+    /**
+     * Finds the Resource Master sheet from the uploaded Provisional Billing workbook.
+     *
+     * Expected sheet examples:
+     *   - Jul - Provisional
+     *   - Aug - Provisional
+     *   - Sep - Provisional
+     *
+     * Ignores:
+     *   - Forecast sheets
+     *   - Pivot sheets
+     */
+    private Sheet findResourceSheet(Workbook workbook) {
+
+        for (int i = 0; i < workbook.getNumberOfSheets(); i++) {
+
+            Sheet sheet = workbook.getSheetAt(i);
+
+            String sheetName = sheet.getSheetName().toLowerCase(Locale.ENGLISH);
+
+            if (sheetName.contains("provisional")
+                    && !sheetName.contains("forecast")
+                    && !sheetName.contains("pivot")) {
+
+                log.info("[Master Import] Resource sheet found: {}", sheet.getSheetName());
+
+                return sheet;
+            }
+        }
+
+        throw new IllegalArgumentException(
+                "Resource sheet not found in workbook."
+        );
+    }
+
+    /**
+     * Finds the SOW Master sheet from the uploaded PO Balance workbook.
+     *
+     * Expected sheet examples:
+     *   - FY-26
+     *   - FY-27
+     *   - FY-28
+     */
+    private Sheet findSowSheet(Workbook workbook) {
+
+        for (int i = 0; i < workbook.getNumberOfSheets(); i++) {
+
+            Sheet sheet = workbook.getSheetAt(i);
+
+            String sheetName = sheet.getSheetName().trim().toUpperCase(Locale.ENGLISH);
+
+            if (sheetName.startsWith("FY")) {
+
+                log.info("[Master Import] SOW sheet found: {}", sheet.getSheetName());
+
+                return sheet;
+            }
+        }
+
+        throw new IllegalArgumentException(
+                "SOW sheet not found in workbook."
+        );
+    }
+
+    /**
+     * Builds a map of Excel header names to their column indexes.
+     *
+     * Example:
+     * "Employee Name" -> 3
+     * "Employee Id"   -> 2
+     * "Location"      -> 5
+     */
+    private Map<String, Integer> buildHeaderMap(Sheet sheet) {
+
+        Map<String, Integer> headerMap = new LinkedHashMap<>();
+
+        Row headerRow = sheet.getRow(sheet.getFirstRowNum());
+
+        if (headerRow == null) {
+            return headerMap;
+        }
+
+        DataFormatter formatter = new DataFormatter();
+
+        for (Cell cell : headerRow) {
+
+            String header = formatter.formatCellValue(cell).trim();
+
+            if (!header.isEmpty()) {
+//                headerMap.put(header, cell.getColumnIndex());
+//                headerMap.put(
+//                        header.trim().toLowerCase(Locale.ENGLISH),
+//                        cell.getColumnIndex()
+//                );
+
+                headerMap.put(
+                        normalizeHeader(header),
+                        cell.getColumnIndex()
+                );
+            }
+        }
+
+        return headerMap;
+    }
+
+    /**
+     * Returns the display value of a cell using the header name.
+     *
+     * If the header is not found, an empty string is returned.
+     */
+//    private String getCellValue(Row row,
+//                                Map<String, Integer> headerMap,
+//                                String headerName) {
+//
+//        Integer columnIndex = headerMap.get(headerName);
+//
+//        if (columnIndex == null) {
+//            return "";
+//        }
+//
+//        Cell cell = row.getCell(columnIndex, Row.MissingCellPolicy.CREATE_NULL_AS_BLANK);
+//
+//        return new DataFormatter().formatCellValue(cell).trim();
+//    }
+
+
+    /**
+     * Returns the cell value for the first matching header name.
+     *
+     * Supports multiple aliases for the same logical field.
+     *
+     * Example:
+     * getCellValue(row, headerMap,
+     *      "Employee Id",
+     *      "Employee ID",
+     *      "Emp ID");
+     */
+    private String getCellValue(Row row,
+                                Map<String, Integer> headerMap,
+                                String... headerNames) {
+
+        DataFormatter formatter = new DataFormatter();
+
+        for (String headerName : headerNames) {
+
+//            Integer columnIndex = headerMap.get(headerName);
+
+//            Integer columnIndex =
+//                    headerMap.get(
+//                            headerName.toLowerCase(Locale.ENGLISH)
+//                    );
+
+            Integer columnIndex =
+                    headerMap.get(
+                            normalizeHeader(headerName)
+                    );
+
+            if (columnIndex != null) {
+
+                Cell cell = row.getCell(
+                        columnIndex,
+                        Row.MissingCellPolicy.CREATE_NULL_AS_BLANK);
+
+                return formatter.formatCellValue(cell).trim();
+            }
+        }
+
+        return "";
+    }
+
+    private BigDecimal parseBigDecimal(String value) {
+
+        if (value == null || value.trim().isEmpty()) {
+            return null;
+        }
+
+        try {
+
+            String cleaned = value
+                    .replace(",", "")
+                    .replace("$", "")
+                    .trim();
+
+            return new BigDecimal(cleaned);
+
+        } catch (Exception ex) {
+
+            log.warn("Unable to parse BigDecimal: {}", value);
+
+            return null;
+        }
+    }
+
+    private LocalDate parseLocalDate(String value) {
+
+        if (value == null || value.trim().isEmpty()) {
+            return null;
+        }
+
+        List<DateTimeFormatter> formats = List.of(
+
+                DateTimeFormatter.ofPattern("dd-MMM-yy"),
+
+                DateTimeFormatter.ofPattern("dd-MMM-yyyy"),
+
+                DateTimeFormatter.ofPattern("dd/MM/yyyy"),
+
+                DateTimeFormatter.ISO_LOCAL_DATE
+        );
+
+        for (DateTimeFormatter formatter : formats) {
+
+            try {
+
+                return LocalDate.parse(value.trim(), formatter);
+
+            } catch (Exception ignored) {
+            }
+        }
+
+        log.warn("Unable to parse date: {}", value);
+
+        return null;
+    }
+
+    private LocalDate getDateValue(
+            Row row,
+            Map<String, Integer> headerMap,
+            String... headerNames) {
+
+        Integer columnIndex = null;
+
+        for (String headerName : headerNames) {
+            columnIndex = headerMap.get(normalizeHeader(headerName));
+
+            if (columnIndex != null) {
+                break;
+            }
+        }
+
+        if (columnIndex == null) {
+            return null;
+        }
+
+        Cell cell = row.getCell(
+                columnIndex,
+                Row.MissingCellPolicy.RETURN_BLANK_AS_NULL
+        );
+
+        if (cell == null) {
+            return null;
+        }
+
+        try {
+
+            /*
+             * Excel stores dates as numeric serial values.
+             */
+            if (cell.getCellType() == CellType.NUMERIC) {
+
+                if (DateUtil.isCellDateFormatted(cell)
+                        || isDateSerial(cell.getNumericCellValue())) {
+
+                    return DateUtil
+                            .getLocalDateTime(
+                                    cell.getNumericCellValue(),
+                                    false
+                            )
+                            .toLocalDate();
+                }
+            }
+
+            /*
+             * Handle dates stored as text.
+             */
+            String value = new DataFormatter()
+                    .formatCellValue(cell)
+                    .trim();
+
+            if (value.isBlank()) {
+                return null;
+            }
+
+            return parseFlexibleDate(value);
+
+        } catch (Exception ex) {
+
+            log.warn(
+                    "Unable to parse date for header(s) {}. Value={}",
+                    String.join(", ", headerNames),
+                    cell
+            );
+
+            return null;
+        }
+    }
+
+    private LocalDate parseFlexibleDate(String value) {
+
+        List<DateTimeFormatter> formatters = List.of(
+
+                DateTimeFormatter.ISO_LOCAL_DATE,
+
+                DateTimeFormatter.ofPattern(
+                        "d-MMM-yy",
+                        Locale.ENGLISH
+                ),
+
+                DateTimeFormatter.ofPattern(
+                        "dd-MMM-yy",
+                        Locale.ENGLISH
+                ),
+
+                DateTimeFormatter.ofPattern(
+                        "d-MMM-yyyy",
+                        Locale.ENGLISH
+                ),
+
+                DateTimeFormatter.ofPattern(
+                        "dd-MMM-yyyy",
+                        Locale.ENGLISH
+                ),
+
+                DateTimeFormatter.ofPattern(
+                        "M/d/yy",
+                        Locale.ENGLISH
+                ),
+
+                DateTimeFormatter.ofPattern(
+                        "M/d/yyyy",
+                        Locale.ENGLISH
+                )
+        );
+
+        for (DateTimeFormatter formatter : formatters) {
+
+            try {
+                return LocalDate.parse(value, formatter);
+            } catch (Exception ignored) {
+            }
+        }
+
+        throw new IllegalArgumentException(
+                "Unsupported date format: " + value
+        );
+    }
+
+    private String normalizeHeader(String header) {
+
+        if (header == null) {
+            return "";
+        }
+
+        return header
+                .trim()
+                .toLowerCase(Locale.ENGLISH)
+                .replaceAll("[^a-z0-9]", "");
     }
 
 }
