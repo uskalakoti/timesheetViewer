@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="en">
+<head th:replace="fragments/layout :: head('Admin — Resources')"></head>
+<body>
+<nav th:replace="fragments/layout :: navbar"></nav>
+<main class="main-content">
+    <div class="page-header">
+        <div>
+            <h1><i class="fa fa-users"></i>Master Data Management</h1>
+            <p class="subtitle" th:text="${#lists.size(resources)} + ' resources configured'"></p>
+        </div>
+        <div class="page-actions">
+            <a th:href="@{/admin}" class="btn btn-secondary"><i class="fa fa-arrow-left"></i> Admin</a>
+
+            <button type="button"
+                    class="btn btn-primary"
+                    onclick="openUploadModal()">
+                <i class="fa fa-upload"></i> Upload Files
+            </button>
+
+            <a th:href="@{/admin/resources/new}" class="btn btn-success"><i class="fa fa-plus"></i> Add Resource</a>
+        </div>
+    </div>
+<!--    <div th:if="${success}" class="alert alert-success"><i class="fa fa-circle-check"></i> <span th:text="${success}"></span></div>-->
+
+    <div th:if="${successMessage}"
+         class="alert alert-success">
+
+        <i class="fa fa-circle-check"></i>
+
+        <span th:text="${successMessage}"></span>
+
+    </div>
+
+    <div th:if="${errorMessage}"
+         class="alert alert-danger">
+
+        <i class="fa fa-circle-exclamation"></i>
+
+        <span th:text="${errorMessage}"></span>
+
+    </div>
+
+    <div class="card">
+        <div class="card-body p-0">
+            <table class="data-table">
+                <thead>
+                <tr><th>Resource ID</th><th>Name</th><th>Daily Rate (USD)</th> <th>Working Hours</th>
+                    <th>Start Date</th><th>End Date</th><th>Actions</th></tr>
+                </thead>
+                <tbody>
+                <tr th:each="r : ${resources}">
+                    <td><span class="badge badge-blue" th:text="${r.resourceId}"></span></td>
+                    <td><strong th:text="${r.name}"></strong></td>
+                    <td th:text="${r.dailyRateUsd != null ? '$' + r.dailyRateUsd : '—'}"></td>
+                    <td th:text="${r.workingHoursPerDay}"></td>
+                    <td th:text="${r.startDate}">—</td>
+                    <td th:text="${r.endDate}">—</td>
+                    <td class="action-cell">
+                        <a th:href="@{/admin/resources/edit/{id}(id=${r.id})}" class="btn btn-sm btn-primary">
+                            <i class="fa fa-pen"></i> Edit
+                        </a>
+                        <form th:action="@{/admin/resources/delete/{id}(id=${r.id})}" method="post"
+                              style="display:inline"
+                              onsubmit="return confirm('Delete resource ' + this.dataset.name + '?')"
+                              th:attr="data-name=${r.name}">
+                            <button type="submit" class="btn btn-sm btn-danger">
+                                <i class="fa fa-trash"></i>
+                            </button>
+                        </form>
+                    </td>
+                </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</main>
+<footer th:replace="fragments/layout :: footer"></footer>
+
+<!-- ================= Upload Master Data Modal ================= -->
+
+<div id="uploadModal" class="modal-overlay" style="display:none;">
+
+    <div class="modal-content">
+
+        <h3>Upload Master Data</h3>
+
+        <form th:action="@{/admin/master-data/upload}"
+              method="post"
+              enctype="multipart/form-data">
+
+            <div class="form-group">
+
+                <label>Master Type</label>
+
+                <select name="masterType" class="form-control" required>
+
+                    <option value="">-- Select --</option>
+
+                    <option value="RESOURCE">Resource Master</option>
+
+                    <option value="SOW">SOW Master</option>
+
+                </select>
+
+            </div>
+
+            <div class="form-group">
+
+                <label>Select File</label>
+
+                <input type="file"
+                       name="file"
+                       accept=".xlsx,.csv"
+                       required>
+
+            </div>
+
+            <div class="modal-actions">
+
+                <button type="submit"
+                        class="btn btn-primary">
+
+                    Upload
+
+                </button>
+
+                <button type="button"
+                        class="btn btn-secondary"
+                        onclick="closeUploadModal()">
+
+                    Cancel
+
+                </button>
+
+            </div>
+
+        </form>
+
+    </div>
+
+</div>
+
+<script>
+
+    function openUploadModal() {
+
+        document
+            .getElementById("uploadModal")
+            .style.display = "flex";
+
+    }
+
+    function closeUploadModal() {
+
+        document
+            .getElementById("uploadModal")
+            .style.display = "none";
+
+    }
+
+</script>
+
+<script th:src="@{/js/app.js}"></script>
+</body>
+</html>
+

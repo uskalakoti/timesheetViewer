@@ -9,14 +9,22 @@ public class Resource {
     @Column(name = "LOCATION")
     private String location;
 
+//    @Column(name = "COMPANY")
+//    private String company;
+
     @Column(name = "COMPANY")
-    private String company;
+    @Builder.Default
+    private String company = "Atain";
 
 
     @Column(name="DAILY_RATE_USD") private BigDecimal dailyRateUsd;
     @Column(name="START_DATE") private LocalDate startDate;
     @Column(name="END_DATE") private LocalDate endDate;
 
+//    @Column(name = "WORKING_HOURS_PER_DAY")
+//    private Double workingHoursPerDay;
+
     @Column(name = "WORKING_HOURS_PER_DAY")
-    private Double workingHoursPerDay;
+    @Builder.Default
+    private Double workingHoursPerDay = 8.0;
 }

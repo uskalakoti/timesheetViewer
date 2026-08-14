@@ -1,5 +1,8 @@
 package com.timesheet.validator.controller;
 
+import com.timesheet.validator.repository.ResourceRepository;
+import com.timesheet.validator.repository.ResourceMasterRepository;
+import com.timesheet.validator.dto.ResourceMasterViewDto;
 
 import com.timesheet.validator.service.ExcelParserService;
 import com.timesheet.validator.service.LeavePlannerWorkbookService;
@@ -37,6 +40,8 @@ import java.time.LocalDate;
 import java.util.HashSet;
 import java.util.Set;
 
+
+
 @Controller
 @RequestMapping("/admin")
 @RequiredArgsConstructor
@@ -44,6 +49,8 @@ import java.util.Set;
 public class AdminController {
 
     private final ResourceRepository     resourceRepo;
+    private final ResourceMasterRepository resourceMasterRepository;
+    private final SowMasterRepository sowMasterRepository;
     private final PublicHolidayRepository holidayRepo;
     private final AppUserRepository      userRepo;
     private final RoleRepository         roleRepo;
@@ -166,9 +173,25 @@ public class AdminController {
     // RESOURCES
     // ══════════════════════════════════════════════════════════════════════════
 
+//    @GetMapping("/resources")
+//    public String resources(Model model) {
+//        model.addAttribute("resources", resourceRepo.findAll());
+//        return "pages/admin/resources";
+//    }
+
     @GetMapping("/resources")
     public String resources(Model model) {
-        model.addAttribute("resources", resourceRepo.findAll());
+
+        List<ResourceMasterViewDto> resources =
+                resourceMasterRepository.findResourceMasterView();
+
+        model.addAttribute("resources", resources);
+
+        model.addAttribute(
+                "sowMasters",
+                sowMasterRepository.findSowMasterView()
+        );
+
         return "pages/admin/resources";
     }
 

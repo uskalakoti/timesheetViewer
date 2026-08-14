@@ -82,13 +82,22 @@
             <column name="LOCATION" type="VARCHAR(100)"/>
 
             <!-- New -->
-            <column name="COMPANY" type="VARCHAR(100)"/>
+<!--            <column name="COMPANY" type="VARCHAR(100)"/>-->
+
+            <column name="COMPANY"
+                    type="VARCHAR(100)"
+                    defaultValue="Atain"/>
 
             <column name="DAILY_RATE_USD" type="DECIMAL(10,2)"/>
             <column name="START_DATE"     type="DATE"/>
             <column name="END_DATE"       type="DATE"/>
 
-            <column name="WORKING_HOURS_PER_DAY" type="DECIMAL(4,2)"/>
+<!--            <column name="WORKING_HOURS_PER_DAY" type="DECIMAL(4,2)"/>-->
+
+            <column name="WORKING_HOURS_PER_DAY"
+                    type="DOUBLE"
+                    defaultValueNumeric="8.0"/>
+
         </createTable>
     </changeSet>
 

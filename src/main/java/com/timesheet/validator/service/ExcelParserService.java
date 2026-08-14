@@ -546,7 +546,14 @@ public class ExcelParserService {
 //                                getCellValue(row, headerMap, "SoW Name", "Project")
 //                        )
 
-                        .project(null)
+//                        .project(null)
+
+                        .project(
+                                getCellValue(row, headerMap,
+                                        "Sow Name",
+                                        "SOW Name"
+                                )
+                        )
 
                         .sowDescription(
                                 getCellValue(
@@ -634,12 +641,19 @@ public class ExcelParserService {
 
                 SowImportDto dto = SowImportDto.builder()
 
+//                        .project(
+//                                getCellValue(
+//                                        row,
+//                                        headerMap,
+//                                        "Project",
+//                                        "Project Name"
+//                                )
+//                        )
+
                         .project(
-                                getCellValue(
-                                        row,
-                                        headerMap,
-                                        "Project",
-                                        "Project Name"
+                                getCellValue(row, headerMap,
+                                        "Sow Name",
+                                        "SOW Name"
                                 )
                         )
 

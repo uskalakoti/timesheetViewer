@@ -90,6 +90,14 @@ public class MasterDataImportService {
             resource.setLocation(dto.getLocation());
             resource.setCompany(dto.getCompany());
 
+            resource.setCompany(
+                    dto.getCompany() != null && !dto.getCompany().isBlank()
+                            ? dto.getCompany()
+                            : "Atain"
+            );
+
+            resource.setWorkingHoursPerDay(8.0);
+
             resourceRepository.save(resource);
 
             /*
