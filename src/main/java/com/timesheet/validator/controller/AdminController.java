@@ -1,5 +1,24 @@
 package com.timesheet.validator.controller;
 
+
+import com.timesheet.validator.domain.PoMaster;
+import com.timesheet.validator.domain.SowPo;
+import com.timesheet.validator.domain.SowPoId;
+
+import com.timesheet.validator.repository.PoMasterRepository;
+import com.timesheet.validator.repository.SowPoRepository;
+
+import org.springframework.transaction.annotation.Transactional;
+
+import com.timesheet.validator.dto.ResourceFormDto;
+import com.timesheet.validator.domain.ResourceSow;
+import com.timesheet.validator.domain.ResourceSowId;
+import com.timesheet.validator.domain.SowMaster;
+import com.timesheet.validator.repository.ResourceSowRepository;
+import com.timesheet.validator.repository.SowMasterRepository;
+import org.springframework.transaction.annotation.Transactional;
+
+
 import com.timesheet.validator.repository.ResourceRepository;
 import com.timesheet.validator.repository.ResourceMasterRepository;
 import com.timesheet.validator.dto.ResourceMasterViewDto;
@@ -49,6 +68,10 @@ import java.util.Set;
 public class AdminController {
 
     private final ResourceRepository     resourceRepo;
+    private final ResourceSowRepository resourceSowRepo;
+    private final SowMasterRepository    sowMasterRepo;
+    private final PoMasterRepository poMasterRepo;
+    private final SowPoRepository sowPoRepo;
     private final ResourceMasterRepository resourceMasterRepository;
     private final SowMasterRepository sowMasterRepository;
     private final PublicHolidayRepository holidayRepo;
@@ -195,50 +218,554 @@ public class AdminController {
         return "pages/admin/resources";
     }
 
+//    @GetMapping("/resources/new")
+//    public String newResource(Model model) {
+//        model.addAttribute("resource", new com.timesheet.validator.domain.Resource());
+//        model.addAttribute("editMode", false);
+//        return "pages/admin/resource-form";
+//    }
+
     @GetMapping("/resources/new")
     public String newResource(Model model) {
-        model.addAttribute("resource", new com.timesheet.validator.domain.Resource());
+
+        ResourceFormDto form = new ResourceFormDto();
+
+        form.setCompany("Atain");
+        form.setWorkingHoursPerDay(
+                props.getDefaultWorkingHoursPerDay()
+        );
+
+        model.addAttribute("resource", form);
         model.addAttribute("editMode", false);
+
         return "pages/admin/resource-form";
     }
+
+//    @GetMapping("/resources/edit/{id}")
+//    public String editResource(@PathVariable Long id, Model model) {
+//        com.timesheet.validator.domain.Resource r = resourceRepo.findById(id)
+//                .orElseThrow(() -> new RuntimeException("Resource not found: " + id));
+//        model.addAttribute("resource", r);
+//        model.addAttribute("editMode", true);
+//        return "pages/admin/resource-form";
+//    }
 
     @GetMapping("/resources/edit/{id}")
     public String editResource(@PathVariable Long id, Model model) {
+
         com.timesheet.validator.domain.Resource r = resourceRepo.findById(id)
-                .orElseThrow(() -> new RuntimeException("Resource not found: " + id));
-        model.addAttribute("resource", r);
+                .orElseThrow(() ->
+                        new RuntimeException("Resource not found: " + id));
+
+        ResourceFormDto form = new ResourceFormDto();
+
+        // ============================================================
+        // RESOURCE
+        // ============================================================
+
+        form.setId(r.getId());
+        form.setResourceId(r.getResourceId());
+        form.setName(r.getName());
+        form.setLocation(r.getLocation());
+        form.setCompany(r.getCompany());
+        form.setDailyRateUsd(r.getDailyRateUsd());
+        form.setWorkingHoursPerDay(r.getWorkingHoursPerDay());
+        form.setStartDate(r.getStartDate());
+        form.setEndDate(r.getEndDate());
+
+
+        // ============================================================
+        // RESOURCE_SOW
+        // ============================================================
+
+        ResourceSow resourceSow = resourceSowRepo
+                .findByResourceId(r.getResourceId())
+                .stream()
+                .findFirst()
+                .orElse(null);
+
+        if (resourceSow != null) {
+
+            form.setSowNumber(resourceSow.getSowNumber());
+            form.setRoleInSow(resourceSow.getRoleInSow());
+            form.setAssignedTeam(resourceSow.getAssignedTeam());
+            form.setSubProject(resourceSow.getSubProject());
+            form.setProjectCode(resourceSow.getProjectCode());
+            form.setTravelExpense(resourceSow.getTravelExpense());
+
+            // ========================================================
+            // SOW_MASTER
+            // ========================================================
+
+            if (resourceSow.getSowNumber() != null) {
+
+                sowMasterRepo
+                        .findBySowNumber(resourceSow.getSowNumber())
+                        .ifPresent(sow -> {
+
+                            form.setProject(sow.getProject());
+                            form.setProjectLocation(
+                                    sow.getProjectLocation()
+                            );
+
+                            form.setSowDescription(
+                                    sow.getDescription()
+                            );
+
+                            form.setSowStartDate(
+                                    sow.getStartDate()
+                            );
+
+                            form.setSowEndDate(
+                                    sow.getEndDate()
+                            );
+                        });
+
+                // ====================================================
+                // SOW_PO -> PO_MASTER
+                // ====================================================
+
+                List<SowPo> sowPos =
+                        sowPoRepo.findBySowNumber(
+                                resourceSow.getSowNumber()
+                        );
+
+                if (!sowPos.isEmpty()) {
+
+                    // Current form supports one PO.
+                    SowPo sowPo = sowPos.get(0);
+
+                    form.setPoNumber(
+                            sowPo.getPoNumber()
+                    );
+
+
+                    if (sowPo.getPoNumber() != null) {
+
+                        poMasterRepo
+                                .findByPoNumber(
+                                        sowPo.getPoNumber()
+                                )
+                                .ifPresent(po -> {
+
+                                    form.setUpdatedPoNumber(
+                                            po.getUpdatedPoNumber()
+                                    );
+
+                                    form.setPoValue(
+                                            po.getPoValue()
+                                    );
+
+                                    form.setPoStartDate(
+                                            po.getStartDate()
+                                    );
+
+                                    form.setPoEndDate(
+                                            po.getEndDate()
+                                    );
+                                });
+                    }
+                }
+
+            }
+
+
+        }
+
+
+        model.addAttribute("resource", form);
         model.addAttribute("editMode", true);
+
         return "pages/admin/resource-form";
     }
 
+//    @PostMapping("/resources/save")
+//    public String saveResource(
+//            @RequestParam(required = false) Long id,
+//            @RequestParam String resourceId,
+//            @RequestParam String name,
+//            @RequestParam(required = false) String dailyRateUsd,
+//            @RequestParam(required = false) Double workingHoursPerDay,
+//            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
+//            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate,
+//            RedirectAttributes ra) {
+//        com.timesheet.validator.domain.Resource r = id != null ? resourceRepo.findById(id).orElse(new com.timesheet.validator.domain.Resource()) : new com.timesheet.validator.domain.Resource();
+//        r.setResourceId(resourceId.trim());
+//        r.setName(name.trim());
+//        r.setWorkingHoursPerDay(
+//                workingHoursPerDay != null
+//                        ? workingHoursPerDay
+//                        : props.getDefaultWorkingHoursPerDay()
+//        );
+//        if (dailyRateUsd != null && !dailyRateUsd.isBlank()) {
+//            try { r.setDailyRateUsd(new BigDecimal(dailyRateUsd.trim())); }
+//            catch (NumberFormatException ignored) {}
+//        }
+//        r.setStartDate(startDate);
+//        r.setEndDate(endDate);
+//        resourceRepo.save(r);
+//        ra.addFlashAttribute("success", "Resource '" + r.getName() + "' saved.");
+//        return "redirect:/admin/resources";
+//    }
+
+
     @PostMapping("/resources/save")
+    @Transactional
     public String saveResource(
+
             @RequestParam(required = false) Long id,
+
             @RequestParam String resourceId,
             @RequestParam String name,
+
+            @RequestParam(required = false) String location,
+            @RequestParam(required = false) String company,
+
             @RequestParam(required = false) String dailyRateUsd,
-            @RequestParam(required = false) Double workingHoursPerDay,
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate,
+
+            @RequestParam(required = false)
+            Double workingHoursPerDay,
+
+            @RequestParam(required = false)
+            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE)
+            LocalDate startDate,
+
+            @RequestParam(required = false)
+            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE)
+            LocalDate endDate,
+
+
+            // RESOURCE_SOW
+            @RequestParam(required = false) String assignedTeam,
+            @RequestParam(required = false) String subProject,
+            @RequestParam(required = false) String projectCode,
+            @RequestParam(required = false) String travelExpense,
+            @RequestParam(required = false) String sowNumber,
+            @RequestParam(required = false) String roleInSow,
+
+
+            // SOW_MASTER
+            @RequestParam(required = false) String project,
+            @RequestParam(required = false) String projectLocation,
+            @RequestParam(required = false) String sowDescription,
+
+            @RequestParam(required = false)
+            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE)
+            LocalDate sowStartDate,
+
+            @RequestParam(required = false)
+            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE)
+            LocalDate sowEndDate,
+
+
+            // PO_MASTER
+            @RequestParam(required = false) String poNumber,
+            @RequestParam(required = false) String updatedPoNumber,
+            @RequestParam(required = false) String poValue,
+
+            @RequestParam(required = false)
+            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE)
+            LocalDate poStartDate,
+
+            @RequestParam(required = false)
+            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE)
+            LocalDate poEndDate,
+
             RedirectAttributes ra) {
-        com.timesheet.validator.domain.Resource r = id != null ? resourceRepo.findById(id).orElse(new com.timesheet.validator.domain.Resource()) : new com.timesheet.validator.domain.Resource();
+
+
+        // ============================================================
+        // 1. RESOURCE
+        // ============================================================
+
+        com.timesheet.validator.domain.Resource r = id != null
+                ? resourceRepo.findById(id)
+                .orElseThrow(() ->
+                        new RuntimeException("Resource not found: " + id))
+                : new com.timesheet.validator.domain.Resource();
+
+
         r.setResourceId(resourceId.trim());
         r.setName(name.trim());
+
+        r.setLocation(
+                location != null && !location.isBlank()
+                        ? location.trim()
+                        : null
+        );
+
+        r.setCompany(
+                company != null && !company.isBlank()
+                        ? company.trim()
+                        : "Atain"
+        );
+
         r.setWorkingHoursPerDay(
                 workingHoursPerDay != null
                         ? workingHoursPerDay
                         : props.getDefaultWorkingHoursPerDay()
         );
-        if (dailyRateUsd != null && !dailyRateUsd.isBlank()) {
-            try { r.setDailyRateUsd(new BigDecimal(dailyRateUsd.trim())); }
-            catch (NumberFormatException ignored) {}
-        }
+
         r.setStartDate(startDate);
         r.setEndDate(endDate);
-        resourceRepo.save(r);
-        ra.addFlashAttribute("success", "Resource '" + r.getName() + "' saved.");
+
+
+        if (dailyRateUsd != null && !dailyRateUsd.isBlank()) {
+
+            try {
+
+                r.setDailyRateUsd(
+                        new BigDecimal(dailyRateUsd.trim())
+                );
+
+            } catch (NumberFormatException e) {
+
+                ra.addFlashAttribute(
+                        "error",
+                        "Invalid Daily Rate value."
+                );
+
+                return "redirect:/admin/resources";
+            }
+        }
+        else {
+            r.setDailyRateUsd(null);
+        }
+
+
+        com.timesheet.validator.domain.Resource savedResource = resourceRepo.save(r);
+
+
+        // ============================================================
+        // 2. RESOURCE_SOW
+        // ============================================================
+
+        if (sowNumber != null && !sowNumber.isBlank()) {
+
+            String cleanSowNumber = sowNumber.trim();
+
+            ResourceSow resourceSow =
+                    resourceSowRepo
+                            .findByResourceId(savedResource.getResourceId())
+                            .stream()
+                            .filter(rs ->
+                                    cleanSowNumber.equals(
+                                            rs.getSowNumber()
+                                    ))
+                            .findFirst()
+                            .orElseGet(ResourceSow::new);
+
+
+            resourceSow.setResourceId(
+                    savedResource.getResourceId()
+            );
+
+            resourceSow.setSowNumber(cleanSowNumber);
+
+            resourceSow.setAssignedTeam(
+                    cleanValue(assignedTeam)
+            );
+
+            resourceSow.setSubProject(
+                    cleanValue(subProject)
+            );
+
+            resourceSow.setProjectCode(
+                    cleanValue(projectCode)
+            );
+
+            resourceSow.setRoleInSow(
+                    cleanValue(roleInSow)
+            );
+
+            if (travelExpense != null && !travelExpense.isBlank()) {
+
+                try {
+
+                    resourceSow.setTravelExpense(
+                            new BigDecimal(travelExpense.trim())
+                    );
+
+                } catch (NumberFormatException e) {
+
+                    ra.addFlashAttribute(
+                            "error",
+                            "Invalid Travel Expense value."
+                    );
+
+                    return "redirect:/admin/resources";
+                }
+
+            } else {
+
+                resourceSow.setTravelExpense(null);
+            }
+
+
+            resourceSowRepo.save(resourceSow);
+
+
+            // ========================================================
+            // 3. SOW_MASTER
+            // ========================================================
+
+            SowMaster sowMaster =
+                    sowMasterRepo
+                            .findBySowNumber(cleanSowNumber)
+                            .orElseGet(SowMaster::new);
+
+            sowMaster.setSowNumber(cleanSowNumber);
+
+            sowMaster.setProject(
+                    cleanValue(project)
+            );
+
+            sowMaster.setProjectLocation(
+                    cleanValue(projectLocation)
+            );
+
+            sowMaster.setDescription(
+                    cleanValue(sowDescription)
+            );
+
+            sowMaster.setStartDate(sowStartDate);
+            sowMaster.setEndDate(sowEndDate);
+
+            if (sowMaster.getActive() == null) {
+                sowMaster.setActive(true);
+            }
+
+            // Existing PO fields on SOW_MASTER
+            sowMaster.setPoNumber(
+                    cleanValue(poNumber)
+            );
+
+            if (poValue != null && !poValue.isBlank()) {
+
+                try {
+
+                    sowMaster.setPoValue(
+                            new BigDecimal(poValue.trim())
+                    );
+
+                } catch (NumberFormatException e) {
+
+                    ra.addFlashAttribute(
+                            "error",
+                            "Invalid PO Value."
+                    );
+
+                    return "redirect:/admin/resources";
+                }
+
+            } else {
+
+                sowMaster.setPoValue(null);
+            }
+
+            sowMasterRepo.save(sowMaster);
+
+            // ========================================================
+            // 4. PO_MASTER
+            // ========================================================
+
+            if (poNumber != null && !poNumber.isBlank()) {
+
+                String cleanPoNumber = poNumber.trim();
+
+                PoMaster poMaster =
+                        poMasterRepo
+                                .findByPoNumber(cleanPoNumber)
+                                .orElseGet(PoMaster::new);
+
+
+                poMaster.setPoNumber(cleanPoNumber);
+
+                poMaster.setUpdatedPoNumber(
+                        cleanValue(updatedPoNumber)
+                );
+
+                if (poValue != null &&
+                        !poValue.isBlank()) {
+
+                    poMaster.setPoValue(
+                            new BigDecimal(
+                                    poValue.trim()
+                            )
+                    );
+
+                } else {
+
+                    poMaster.setPoValue(null);
+                }
+
+                poMaster.setStartDate(poStartDate);
+                poMaster.setEndDate(poEndDate);
+
+                if (poMaster.getActive() == null) {
+                    poMaster.setActive(true);
+                }
+
+
+                PoMaster savedPo =
+                        poMasterRepo.save(poMaster);
+
+
+                // ====================================================
+                // 5. SOW_PO
+                // ====================================================
+
+                SowPoId sowPoId = new SowPoId();
+
+                sowPoId.setSowNumber(
+                        cleanSowNumber
+                );
+
+                sowPoId.setPoNumber(
+                        savedPo.getPoNumber()
+                );
+
+
+                if (!sowPoRepo.existsById(sowPoId)) {
+
+                    SowPo sowPo = new SowPo();
+
+                    sowPo.setSowNumber(
+                            cleanSowNumber
+                    );
+
+                    sowPo.setPoNumber(
+                            savedPo.getPoNumber()
+                    );
+
+                    sowPoRepo.save(sowPo);
+                }
+            }
+
+        }
+
+
+        // ============================================================
+        // SUCCESS
+        // ============================================================
+
+        ra.addFlashAttribute(
+                "success",
+                "Resource '" + savedResource.getName() + "' saved successfully."
+        );
+
         return "redirect:/admin/resources";
     }
+
+    private String cleanValue(String value) {
+
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+
+        return value.trim();
+    }
+
 
     @PostMapping("/resources/delete/{id}")
     public String deleteResource(@PathVariable Long id, RedirectAttributes ra) {

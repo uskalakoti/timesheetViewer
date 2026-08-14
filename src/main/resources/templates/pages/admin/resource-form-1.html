@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="en">
+<head th:replace="fragments/layout :: head('Admin — Resource Form')"></head>
+<body>
+<nav th:replace="fragments/layout :: navbar"></nav>
+<main class="main-content" style="max-width:700px">
+    <div class="page-header">
+        <div>
+            <h1 th:text="${editMode} ? '✏ Edit Resource' : '➕ Add Resource'"></h1>
+            <p class="subtitle">Resource master data</p>
+        </div>
+        <a th:href="@{/admin/resources}" class="btn btn-secondary"><i class="fa fa-arrow-left"></i> Back</a>
+    </div>
+    <div class="card">
+        <div class="card-body">
+            <form th:action="@{/admin/resources/save}" method="post">
+                <input type="hidden" name="id" th:value="${resource.id}"/>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="required">Resource ID</label>
+                        <input type="text" name="resourceId" class="form-input"
+                               th:value="${resource.resourceId}" placeholder="RES-001" required/>
+                    </div>
+                    <div class="form-group">
+                        <label class="required">Full Name</label>
+                        <input type="text" name="name" class="form-input"
+                               th:value="${resource.name}" placeholder="John Smith" required/>
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Daily Rate (USD)</label>
+                        <input type="number" name="dailyRateUsd" class="form-input"
+                               th:value="${resource.dailyRateUsd}" placeholder="150" step="0.01" min="0"/>
+                    </div>
+                    <div class="form-group">
+                        <label>Working Hours / Day</label>
+                        <input type="number"
+                               name="workingHoursPerDay"
+                               class="form-input"
+                               th:value="${resource.workingHoursPerDay}"
+                               placeholder="8"
+                               step="0.5"
+                               min="1"
+                               max="24"/>
+                    </div>
+                </div>
+
+
+
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Engagement Start</label>
+                        <input type="date" name="startDate" class="form-input"
+                               th:value="${resource.startDate}"/>
+                    </div>
+                    <div class="form-group">
+                        <label>Engagement End</label>
+                        <input type="date" name="endDate" class="form-input"
+                               th:value="${resource.endDate}"/>
+                    </div>
+                </div>
+                <div class="form-actions">
+                    <button type="submit" class="btn btn-success">
+                        <i class="fa fa-save"></i> Save Resource
+                    </button>
+                    <a th:href="@{/admin/resources}" class="btn btn-secondary">Cancel</a>
+                </div>
+            </form>
+        </div>
+    </div>
+</main>
+<footer th:replace="fragments/layout :: footer"></footer>
+<script th:src="@{/js/app.js}"></script>
+</body>
+</html>
