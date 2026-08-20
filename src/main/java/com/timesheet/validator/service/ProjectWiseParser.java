@@ -167,6 +167,15 @@ public class ProjectWiseParser {
             }
 
             /*
+            * Skip the hierarchy table header row. The header uses the same
+            * column as project names (col D), e.g. "Project (Mandatory)", and
+            * must not be treated as a real project/sub-project/project-code.
+            */
+            if (PROJECT_HEADER.equalsIgnoreCase(project)) {
+                continue;
+            }
+
+            /*
             * Stop at Grand Total.
             */
             if ("Grand Total".equalsIgnoreCase(project)) {
