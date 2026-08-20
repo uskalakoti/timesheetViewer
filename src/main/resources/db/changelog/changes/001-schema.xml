@@ -77,9 +77,27 @@
             <column name="ID"             type="BIGINT" autoIncrement="true"><constraints primaryKey="true" nullable="false"/></column>
             <column name="RESOURCE_ID"    type="VARCHAR(20)"><constraints nullable="false" unique="true"/></column>
             <column name="NAME"           type="VARCHAR(100)"><constraints nullable="false"/></column>
+
+            <!-- New -->
+            <column name="LOCATION" type="VARCHAR(100)"/>
+
+            <!-- New -->
+<!--            <column name="COMPANY" type="VARCHAR(100)"/>-->
+
+            <column name="COMPANY"
+                    type="VARCHAR(100)"
+                    defaultValue="Atain"/>
+
             <column name="DAILY_RATE_USD" type="DECIMAL(10,2)"/>
             <column name="START_DATE"     type="DATE"/>
             <column name="END_DATE"       type="DATE"/>
+
+<!--            <column name="WORKING_HOURS_PER_DAY" type="DECIMAL(4,2)"/>-->
+
+            <column name="WORKING_HOURS_PER_DAY"
+                    type="DOUBLE"
+                    defaultValueNumeric="8.0"/>
+
         </createTable>
     </changeSet>
 
@@ -158,6 +176,13 @@
         <createTable tableName="SOW_MASTER">
             <column name="ID"          type="BIGINT" autoIncrement="true"><constraints primaryKey="true" nullable="false"/></column>
             <column name="SOW_NUMBER"  type="VARCHAR(50)"><constraints nullable="false" unique="true"/></column>
+
+            <!-- New -->
+            <column name="PROJECT" type="VARCHAR(150)"/>
+
+            <!-- New -->
+            <column name="PROJECT_LOCATION" type="VARCHAR(100)"/>
+
             <column name="PO_NUMBER"   type="VARCHAR(50)"/>
             <column name="PO_VALUE"    type="DECIMAL(15,2)"/>
             <column name="CLIENT"      type="VARCHAR(100)"/>
@@ -168,12 +193,75 @@
         </createTable>
     </changeSet>
 
+
+    <!-- ── PO master table ─────────────────────────────────────────────── -->
+    <changeSet id="003-po-master" author="xyzsoft">
+        <createTable tableName="PO_MASTER">
+
+            <column name="ID" type="BIGINT" autoIncrement="true">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+
+            <column name="PO_NUMBER" type="VARCHAR(50)">
+                <constraints nullable="false" unique="true"/>
+            </column>
+
+            <column name="UPDATED_PO_NUMBER" type="VARCHAR(50)"/>
+
+            <column name="PO_VALUE" type="DECIMAL(15,2)"/>
+
+            <column name="START_DATE" type="DATE"/>
+
+            <column name="END_DATE" type="DATE"/>
+
+            <column name="ACTIVE" type="BOOLEAN"
+                    defaultValueBoolean="true"/>
+
+        </createTable>
+    </changeSet>
+
+
+    <!-- ── SOW ↔ PO mapping ───────────────────────────────────────────── -->
+    <changeSet id="003-sow-po" author="xyzsoft">
+
+        <createTable tableName="SOW_PO">
+
+            <column name="SOW_NUMBER" type="VARCHAR(50)">
+                <constraints nullable="false"/>
+            </column>
+
+            <column name="PO_NUMBER" type="VARCHAR(50)">
+                <constraints nullable="false"/>
+            </column>
+
+        </createTable>
+
+        <addPrimaryKey
+                tableName="SOW_PO"
+                columnNames="SOW_NUMBER,PO_NUMBER"
+                constraintName="PK_SOW_PO"/>
+
+    </changeSet>
+
     <!-- ── Resource ↔ SOW mapping (many-to-many) ───────────────────────── -->
     <changeSet id="003-resource-sow" author="xyzsoft">
         <createTable tableName="RESOURCE_SOW">
             <column name="RESOURCE_ID" type="VARCHAR(20)"><constraints nullable="false"/></column>
             <column name="SOW_NUMBER"  type="VARCHAR(50)"><constraints nullable="false"/></column>
             <column name="ROLE_IN_SOW" type="VARCHAR(100)"/>
+
+            <!-- New -->
+            <column name="ASSIGNED_TEAM" type="VARCHAR(100)"/>
+
+            <!-- New -->
+            <column name="PROJECT_CODE" type="VARCHAR(50)"/>
+
+            <!-- New -->
+            <column name="SUB_PROJECT" type="VARCHAR(100)"/>
+
+            <!-- New -->
+            <column name="TRAVEL_EXPENSE" type="DECIMAL(10,2)"/>
+
         </createTable>
         <addPrimaryKey tableName="RESOURCE_SOW"
                        columnNames="RESOURCE_ID,SOW_NUMBER"

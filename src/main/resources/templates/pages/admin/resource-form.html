@@ -1,40 +1,158 @@
 <!DOCTYPE html>
 <html xmlns:th="http://www.thymeleaf.org" lang="en">
+
 <head th:replace="fragments/layout :: head('Admin — Resource Form')"></head>
+
 <body>
+
 <nav th:replace="fragments/layout :: navbar"></nav>
-<main class="main-content" style="max-width:700px">
+
+<main class="main-content" style="max-width:900px">
+
+
+    <!-- =====================================================
+                     PAGE HEADER
+                     ===================================================== -->
+
     <div class="page-header">
+
         <div>
-            <h1 th:text="${editMode} ? '✏ Edit Resource' : '➕ Add Resource'"></h1>
-            <p class="subtitle">Resource master data</p>
+            <h1 th:text="${editMode} ? '✏ Edit Resource' : '➕ Add Resource'">
+                Edit Resource
+            </h1>
+
+            <p class="subtitle">
+                Resource master data
+            </p>
         </div>
-        <a th:href="@{/admin/resources}" class="btn btn-secondary"><i class="fa fa-arrow-left"></i> Back</a>
+
+        <a th:href="@{/admin/resources}"
+           class="btn btn-secondary">
+
+            <i class="fa fa-arrow-left"></i>
+            Back
+
+        </a>
+
     </div>
+
+
     <div class="card">
+
         <div class="card-body">
-            <form th:action="@{/admin/resources/save}" method="post">
-                <input type="hidden" name="id" th:value="${resource.id}"/>
-                <div class="form-row">
-                    <div class="form-group">
-                        <label class="required">Resource ID</label>
-                        <input type="text" name="resourceId" class="form-input"
-                               th:value="${resource.resourceId}" placeholder="RES-001" required/>
-                    </div>
-                    <div class="form-group">
-                        <label class="required">Full Name</label>
-                        <input type="text" name="name" class="form-input"
-                               th:value="${resource.name}" placeholder="John Smith" required/>
-                    </div>
+
+            <form th:action="@{/admin/resources/save}"
+                  method="post">
+
+                <input type="hidden"
+                       name="id"
+                       th:value="${resource.id}"/>
+
+
+                <!-- =====================================================
+                     RESOURCE INFORMATION
+                     ===================================================== -->
+
+                <div class="card-header">
+                    <i class="fa fa-user"></i>
+                    Resource Information
                 </div>
+
                 <div class="form-row">
+
                     <div class="form-group">
-                        <label>Daily Rate (USD)</label>
-                        <input type="number" name="dailyRateUsd" class="form-input"
-                               th:value="${resource.dailyRateUsd}" placeholder="150" step="0.01" min="0"/>
+
+                        <label class="required">
+                            Employee ID
+                        </label>
+
+                        <input type="text"
+                               name="resourceId"
+                               class="form-input"
+                               th:value="${resource.resourceId}"
+                               placeholder="RES-001"
+                               required/>
+
                     </div>
+
+
                     <div class="form-group">
-                        <label>Working Hours / Day</label>
+
+                        <label class="required">
+                            Employee Name
+                        </label>
+
+                        <input type="text"
+                               name="name"
+                               class="form-input"
+                               th:value="${resource.name}"
+                               placeholder="John Smith"
+                               required/>
+
+                    </div>
+
+                </div>
+
+
+                <div class="form-row">
+
+                    <div class="form-group">
+
+                        <label>
+                            Employee Location
+                        </label>
+
+                        <input type="text"
+                               name="location"
+                               class="form-input"
+                               th:value="${resource.location}"
+                               placeholder="India"/>
+
+                    </div>
+
+
+                    <div class="form-group">
+
+                        <label>
+                            Company
+                        </label>
+
+                        <input type="text"
+                               name="company"
+                               class="form-input"
+                               th:value="${resource.company}"
+                               placeholder="Atain"/>
+
+                    </div>
+
+                </div>
+
+
+                <div class="form-row">
+
+                    <div class="form-group">
+
+                        <label>
+                            Daily Rate (USD)
+                        </label>
+
+                        <input type="number"
+                               name="dailyRateUsd"
+                               class="form-input"
+                               th:value="${resource.dailyRateUsd}"
+                               placeholder="150"
+                               step="0.01"
+                               min="0"/>
+
+                    </div>
+
+
+                    <div class="form-group">
+
+                        <label>
+                            Working Hours / Day
+                        </label>
+
                         <input type="number"
                                name="workingHoursPerDay"
                                class="form-input"
@@ -43,35 +161,383 @@
                                step="0.5"
                                min="1"
                                max="24"/>
+
                     </div>
+
                 </div>
-
-
 
 
                 <div class="form-row">
+
                     <div class="form-group">
-                        <label>Engagement Start</label>
-                        <input type="date" name="startDate" class="form-input"
+
+                        <label>
+                            Employee Start Date
+                        </label>
+
+                        <input type="date"
+                               name="startDate"
+                               class="form-input"
                                th:value="${resource.startDate}"/>
+
                     </div>
+
+
                     <div class="form-group">
-                        <label>Engagement End</label>
-                        <input type="date" name="endDate" class="form-input"
+
+                        <label>
+                            Employee End Date
+                        </label>
+
+                        <input type="date"
+                               name="endDate"
+                               class="form-input"
                                th:value="${resource.endDate}"/>
+
                     </div>
+
                 </div>
+
+
+                <!-- =====================================================
+                     RESOURCE SOW
+                     ===================================================== -->
+
+                <div class="card-header" style="margin-top:25px;">
+                    <i class="fa fa-diagram-project"></i>
+                    SOW Assignment
+                </div>
+
+
+                <div class="form-row">
+
+                    <div class="form-group">
+
+                        <label>
+                            SOW Number
+                        </label>
+
+                        <input type="text"
+                               name="sowNumber"
+                               class="form-input"
+                               th:value="${resource.sowNumber}"
+                               placeholder="SOW_18_2026"/>
+
+                    </div>
+
+
+                    <div class="form-group">
+
+                        <label>
+                            Assigned Team
+                        </label>
+
+                        <input type="text"
+                               name="assignedTeam"
+                               class="form-input"
+                               th:value="${resource.assignedTeam}"
+                               placeholder="Development"/>
+
+                    </div>
+
+                </div>
+
+
+                <div class="form-row">
+
+                    <div class="form-group">
+
+                        <label>
+                            Project Code
+                        </label>
+
+                        <input type="text"
+                               name="projectCode"
+                               class="form-input"
+                               th:value="${resource.projectCode}"
+                               placeholder="529NF.40.02"/>
+
+                    </div>
+
+
+                    <div class="form-group">
+
+                        <label>
+                            Sub-Project
+                        </label>
+
+                        <input type="text"
+                               name="subProject"
+                               class="form-input"
+                               th:value="${resource.subProject}"
+                               placeholder="APP Mod AB-OPX"/>
+
+                    </div>
+
+                </div>
+
+
+                <div class="form-row">
+
+                    <div class="form-group">
+
+                        <label>
+                            Role in SOW
+                        </label>
+
+                        <input type="text"
+                               name="roleInSow"
+                               class="form-input"
+                               th:value="${resource.roleInSow}"
+                               placeholder="System Analyst"/>
+
+                    </div>
+
+
+                    <div class="form-group">
+
+                        <label>
+                            Travel Expense
+                        </label>
+
+                        <input type="number"
+                               name="travelExpense"
+                               class="form-input"
+                               th:value="${resource.travelExpense}"
+                               placeholder="0"
+                               step="0.01"
+                               min="0"/>
+
+                    </div>
+
+                </div>
+
+
+                <!-- =====================================================
+                     SOW MASTER
+                     ===================================================== -->
+
+                <div class="card-header" style="margin-top:25px;">
+                    <i class="fa fa-folder-open"></i>
+                    SOW Details
+                </div>
+
+
+                <div class="form-row">
+
+                    <div class="form-group">
+
+                        <label>
+                            Project
+                        </label>
+
+                        <input type="text"
+                               name="project"
+                               class="form-input"
+                               th:value="${resource.project}"
+                               placeholder="Australia Maintenance"/>
+
+                    </div>
+
+
+                    <div class="form-group">
+
+                        <label>
+                            Project Location
+                        </label>
+
+                        <input type="text"
+                               name="projectLocation"
+                               class="form-input"
+                               th:value="${resource.projectLocation}"
+                               placeholder="Australia"/>
+
+                    </div>
+
+                </div>
+
+
+                <div class="form-group">
+
+                    <label>
+                        SOW Description
+                    </label>
+
+                    <textarea name="sowDescription"
+                              class="form-input"
+                              rows="3"
+                              th:text="${resource.sowDescription}"
+                              placeholder="SOW description"></textarea>
+
+                </div>
+
+
+                <div class="form-row">
+
+                    <div class="form-group">
+
+                        <label>
+                            SOW Start Date
+                        </label>
+
+                        <input type="date"
+                               name="sowStartDate"
+                               class="form-input"
+                               th:value="${resource.sowStartDate}"/>
+
+                    </div>
+
+
+                    <div class="form-group">
+
+                        <label>
+                            SOW End Date
+                        </label>
+
+                        <input type="date"
+                               name="sowEndDate"
+                               class="form-input"
+                               th:value="${resource.sowEndDate}"/>
+
+                    </div>
+
+                </div>
+
+
+                <!-- =====================================================
+                     PO
+                     ===================================================== -->
+
+                <div class="card-header" style="margin-top:25px;">
+                    <i class="fa fa-file-invoice-dollar"></i>
+                    Purchase Order
+                </div>
+
+
+                <div class="form-row">
+
+                    <div class="form-group">
+
+                        <label>
+                            PO #
+                        </label>
+
+                        <input type="text"
+                               name="poNumber"
+                               class="form-input"
+                               th:value="${resource.poNumber}"
+                               placeholder="3429003385"/>
+
+                    </div>
+
+
+                    <div class="form-group">
+
+                        <label>
+                            Updated PO #
+                        </label>
+
+                        <input type="text"
+                               name="updatedPoNumber"
+                               class="form-input"
+                               th:value="${resource.updatedPoNumber}"
+                               placeholder="Updated PO Number"/>
+
+                    </div>
+
+                </div>
+
+
+                <div class="form-row">
+
+                    <div class="form-group">
+
+                        <label>
+                            PO Value
+                        </label>
+
+                        <input type="number"
+                               name="poValue"
+                               class="form-input"
+                               th:value="${resource.poValue}"
+                               placeholder="500000"
+                               step="0.01"
+                               min="0"/>
+
+                    </div>
+
+
+                    <div class="form-group">
+
+                        <label>
+                            PO Start Date
+                        </label>
+
+                        <input type="date"
+                               name="poStartDate"
+                               class="form-input"
+                               th:value="${resource.poStartDate}"/>
+
+                    </div>
+
+                </div>
+
+
+                <div class="form-row">
+
+                    <div class="form-group">
+
+                        <label>
+                            PO End Date
+                        </label>
+
+                        <input type="date"
+                               name="poEndDate"
+                               class="form-input"
+                               th:value="${resource.poEndDate}"/>
+
+                    </div>
+
+                    <div class="form-group"></div>
+
+                </div>
+
+
+                <!-- =====================================================
+                     ACTIONS
+                     ===================================================== -->
+
                 <div class="form-actions">
-                    <button type="submit" class="btn btn-success">
-                        <i class="fa fa-save"></i> Save Resource
+
+                    <button type="submit"
+                            class="btn btn-success">
+
+                        <i class="fa fa-save"></i>
+                        Save Resource
+
                     </button>
-                    <a th:href="@{/admin/resources}" class="btn btn-secondary">Cancel</a>
+
+
+                    <a th:href="@{/admin/resources}"
+                       class="btn btn-secondary">
+
+                        Cancel
+
+                    </a>
+
                 </div>
+
             </form>
+
         </div>
+
     </div>
+
 </main>
+
 <footer th:replace="fragments/layout :: footer"></footer>
+
 <script th:src="@{/js/app.js}"></script>
+
 </body>
 </html>
