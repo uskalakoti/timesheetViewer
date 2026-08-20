@@ -54,7 +54,7 @@
             <div class="validation-title">
 
                 <i id="validationChevron"
-                   class="fa fa-chevron-down"></i>
+                   class="fa fa-chevron-right"></i>
 
                 <i class="fa fa-check-circle"></i>
 
@@ -199,7 +199,8 @@
 
 
 
-        <div id="appliedValidationsBody" class="card-body validation-chip-container">
+        <div id="appliedValidationsBody" class="card-body validation-chip-container"
+             style="display:none">
 
         <span th:each="rule : ${enabledRules}"
               class="validation-chip">
@@ -219,6 +220,9 @@
     </div>
     <div th:if="${warning}" class="alert alert-warning">
         <i class="fa fa-triangle-exclamation"></i> <span th:text="${warning}"></span>
+    </div>
+    <div th:if="${error}" class="alert alert-danger">
+        <i class="fa fa-circle-xmark"></i> <span th:text="${error}"></span>
     </div>
 
 
@@ -452,11 +456,6 @@
                     Timesheet error(s), then re-validate.
                 </span>
 
-                <span th:if="${timesheetErrors == 0}" class="phase-hint ok">
-                    <i class="fa fa-circle-check"></i>
-                    Timesheet is clean.
-                </span>
-
                 <form th:action="@{/view/{id}/advance(id=${uploadSession.sessionId})}"
                     method="post"
                     style="display:inline">
@@ -490,13 +489,20 @@
 
                 </span>
 
-                <span th:if="${pivotErrors == 0}" class="phase-hint ok">
+                <form th:action="@{/view/{id}/reset-phase(id=${uploadSession.sessionId})}"
+                    method="post"
+                    style="display:inline">
 
-                    <i class="fa fa-circle-check"></i>
+                    <button class="btn btn-secondary"
+                            type="submit">
 
-                    Pivot validation completed.
+                        <i class="fa fa-arrow-left"></i>
 
-                </span>
+                        Back to Timesheet
+
+                    </button>
+
+                </form>
 
                 <form th:action="@{/view/{id}/advance(id=${uploadSession.sessionId})}"
                     method="post"
@@ -508,21 +514,6 @@
 
                         Proceed to Projectwise
                         <i class="fa fa-arrow-right"></i>
-
-                    </button>
-
-                </form>
-
-                <form th:action="@{/view/{id}/reset-phase(id=${uploadSession.sessionId})}"
-                    method="post"
-                    style="display:inline">
-
-                    <button class="btn btn-secondary"
-                            type="submit">
-
-                        <i class="fa fa-arrow-left"></i>
-
-                        Back to Timesheet
 
                     </button>
 
@@ -543,10 +534,20 @@
                     Project Wise error(s), then re-validate.
                 </span>
 
-                <span th:if="${projectWiseErrors == 0}" class="phase-hint ok">
-                    <i class="fa fa-circle-check"></i>
-                    Projectwise validation completed.
-                </span>
+                <form th:action="@{/view/{id}/reset-phase(id=${uploadSession.sessionId})}"
+                    method="post"
+                    style="display:inline">
+
+                    <button class="btn btn-secondary"
+                            type="submit">
+
+                        <i class="fa fa-arrow-left"></i>
+
+                        Back to Pivot
+
+                    </button>
+
+                </form>
 
                 <form th:action="@{/view/{id}/advance(id=${uploadSession.sessionId})}"
                     method="post"
@@ -558,21 +559,6 @@
 
                         Proceed to Summary
                         <i class="fa fa-arrow-right"></i>
-
-                    </button>
-
-                </form>
-
-                <form th:action="@{/view/{id}/reset-phase(id=${uploadSession.sessionId})}"
-                    method="post"
-                    style="display:inline">
-
-                    <button class="btn btn-secondary"
-                            type="submit">
-
-                        <i class="fa fa-arrow-left"></i>
-
-                        Back to Pivot
 
                     </button>
 
@@ -592,10 +578,20 @@
                     Summary error(s), then re-validate.
                 </span>
 
-                <span th:if="${summaryErrors == 0}" class="phase-hint ok">
-                    <i class="fa fa-circle-check"></i>
-                    Summary validation completed.
-                </span>
+                <form th:action="@{/view/{id}/reset-phase(id=${uploadSession.sessionId})}"
+                    method="post"
+                    style="display:inline">
+
+                    <button class="btn btn-secondary"
+                            type="submit">
+
+                        <i class="fa fa-arrow-left"></i>
+
+                        Back to Projectwise
+
+                    </button>
+
+                </form>
 
                 <form th:action="@{/view/{id}/advance(id=${uploadSession.sessionId})}"
                     method="post"
@@ -607,21 +603,6 @@
 
                         Proceed to Commercial
                         <i class="fa fa-arrow-right"></i>
-
-                    </button>
-
-                </form>
-
-                <form th:action="@{/view/{id}/reset-phase(id=${uploadSession.sessionId})}"
-                    method="post"
-                    style="display:inline">
-
-                    <button class="btn btn-secondary"
-                            type="submit">
-
-                        <i class="fa fa-arrow-left"></i>
-
-                        Back to Projectwise
 
                     </button>
 
@@ -639,11 +620,6 @@
                     Resolve
                     <b th:text="${commercialErrors}">0</b>
                     Commercial error(s), then re-validate.
-                </span>
-
-                <span th:if="${commercialErrors == 0}" class="phase-hint ok">
-                    <i class="fa fa-circle-check"></i>
-                    Commercial validation completed successfully.
                 </span>
 
                 <form th:action="@{/view/{id}/reset-phase(id=${uploadSession.sessionId})}"
@@ -852,6 +828,11 @@
 
     function updateModalRuleCount() {
 
+        const all =
+            document.querySelectorAll(
+                '#rulesForm input[name="rules"]:not([disabled])'
+            );
+
         const count =
             document.querySelectorAll(
                 '#rulesForm input[name="rules"]:not([disabled]):checked'
@@ -869,7 +850,9 @@
         const errorBox =
             document.getElementById("modalRuleError");
 
-        if (count === 0) {
+        // Only block save when there ARE toggleable rules but none are chosen.
+        // On always-on phases there are no checkboxes, so saving just re-validates.
+        if (all.length > 0 && count === 0) {
 
             saveBtn.disabled = true;
 

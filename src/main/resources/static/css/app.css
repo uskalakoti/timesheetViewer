@@ -11,7 +11,7 @@
     --shadow:  0 2px 8px rgba(0,0,0,.08); --radius: 8px;
     --formula-bg:  #EFF8FF;
     --formula-border: #93C5FD;
-    --header-bg: #1F4E79;
+    --header-bg: #2E75B6;
 }
 html { font-size: 14px; }
 body { font-family: 'Segoe UI', Arial, sans-serif; background: var(--gray);
@@ -1963,14 +1963,17 @@ select.form-input { cursor: pointer; }
     align-items: center;
     justify-content: space-between;
     gap: 16px;
-    flex-wrap: wrap;
+    flex-wrap: nowrap;
     background: var(--white);
     border: 1px solid var(--border);
     border-radius: var(--radius);
     padding: 12px 16px;
     margin: 0 0 12px;
 }
-.phase-steps { display: flex; align-items: center; gap: 10px; }
+.phase-steps {
+    display: flex; align-items: center; gap: 8px;
+    flex: 1 1 auto; min-width: 0; overflow-x: auto;
+}
 .phase-step {
     display: flex;
     align-items: center;
@@ -1978,6 +1981,8 @@ select.form-input { cursor: pointer; }
     font-size: .9rem;
     font-weight: 600;
     color: var(--dgray);
+    white-space: nowrap;
+    flex-shrink: 0;
 }
 .phase-step .phase-num {
     display: inline-flex; align-items: center; justify-content: center;
@@ -1992,10 +1997,10 @@ select.form-input { cursor: pointer; }
 .phase-step.locked        { color: var(--dgray); opacity: .8; }
 .phase-step.locked .phase-num  { background: var(--lpurple); color: var(--purple); border-color: #D6C9EC; }
 
-.phase-connector { width: 46px; height: 2px; background: var(--border); border-radius: 2px; }
+.phase-connector { width: 32px; height: 2px; background: var(--border); border-radius: 2px; flex: 0 0 auto; }
 .phase-connector.done { background: var(--green); }
 
-.phase-action { display: flex; align-items: center; gap: 12px; }
+.phase-action { display: flex; align-items: center; gap: 12px; flex: 0 0 auto; }
 .phase-hint {
     font-size: .82rem; color: var(--red);
     display: inline-flex; align-items: center; gap: 6px;
@@ -2007,6 +2012,13 @@ select.form-input { cursor: pointer; }
     cursor: not-allowed;
 }
 .phase-tab-lock { margin-left: 6px; font-size: .7rem; }
+
+/* Mobile: navigation buttons move below the stage indicators */
+@media (max-width: 992px) {
+    .phase-bar { flex-wrap: wrap; gap: 12px; }
+    .phase-steps { flex: 1 1 100%; width: 100%; }
+    .phase-action { flex: 1 1 100%; justify-content: flex-end; }
+}
 
 .phase-pulse { animation: phase-pulse 0.9s ease; }
 @keyframes phase-pulse {
