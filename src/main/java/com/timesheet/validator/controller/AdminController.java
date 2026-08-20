@@ -1,5 +1,6 @@
 package com.timesheet.validator.controller;
 
+import java.util.Optional;
 
 import com.timesheet.validator.domain.PoMaster;
 import com.timesheet.validator.domain.SowPo;
@@ -11,6 +12,7 @@ import com.timesheet.validator.repository.SowPoRepository;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.timesheet.validator.dto.ResourceFormDto;
+import com.timesheet.validator.dto.SowMasterEditDto;
 import com.timesheet.validator.domain.ResourceSow;
 import com.timesheet.validator.domain.ResourceSowId;
 import com.timesheet.validator.domain.SowMaster;
@@ -28,6 +30,9 @@ import com.timesheet.validator.service.LeavePlannerWorkbookService;
 import com.timesheet.validator.service.SheetViewService;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.core.io.Resource;
+import org.springframework.core.io.ClassPathResource;
+//import com.timesheet.validator.domain.Resource;
+
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -74,6 +79,8 @@ public class AdminController {
     private final SowPoRepository sowPoRepo;
     private final ResourceMasterRepository resourceMasterRepository;
     private final SowMasterRepository sowMasterRepository;
+    private final SowPoRepository sowPoRepository;
+    private final PoMasterRepository poMasterRepository;
     private final PublicHolidayRepository holidayRepo;
     private final AppUserRepository      userRepo;
     private final RoleRepository         roleRepo;
@@ -767,14 +774,403 @@ public class AdminController {
     }
 
 
+//    @PostMapping("/resources/delete/{id}")
+//    public String deleteResource(@PathVariable Long id, RedirectAttributes ra) {
+//        resourceRepo.findById(id).ifPresent(r -> {
+//            resourceRepo.delete(r);
+//            ra.addFlashAttribute("success", "Resource '" + r.getName() + "' deleted.");
+//        });
+//        return "redirect:/admin/resources";
+//    }
+
+
+//    @PostMapping("/resources/delete/{id}")
+//    public String deleteResource(
+//            @PathVariable Long id,
+//            RedirectAttributes ra) {
+//
+//        try {
+//            Optional<com.timesheet.validator.domain.Resource> resourceOpt = resourceRepo.findById(id);
+//
+//            if (resourceOpt.isEmpty()) {
+//                ra.addFlashAttribute(
+//                        "errorMessage",
+//                        "Unable to delete resource."
+//                );
+//                return "redirect:/admin/resources";
+//            }
+//
+//            Resource resource = (Resource) resourceOpt.get();
+//
+//            resourceRepo.delete((com.timesheet.validator.domain.Resource) resource);
+//
+//            ra.addFlashAttribute(
+//                    "successMessage",
+//                    "Resource deleted successfully."
+//            );
+//
+//        } catch (Exception e) {
+//
+//            ra.addFlashAttribute(
+//                    "errorMessage",
+//                    "Unable to delete resource."
+//            );
+//        }
+//
+//        return "redirect:/admin/resources";
+//    }
+
+//    @PostMapping("/resources/delete/{id}")
+//    public String deleteResource(
+//            @PathVariable Long id,
+//            RedirectAttributes ra) {
+//
+//        try {
+//            Optional<com.timesheet.validator.domain.Resource> resourceOpt = resourceRepo.findById(id);
+//
+//            if (resourceOpt.isEmpty()) {
+//                ra.addFlashAttribute(
+//                        "errorMessage",
+//                        "Unable to delete resource."
+//                );
+//                return "redirect:/admin/resources";
+//            }
+//
+//            com.timesheet.validator.domain.Resource resource = resourceOpt.get();
+//
+//            resourceRepo.delete(resource);
+//
+//            ra.addFlashAttribute(
+//                    "successMessage",
+//                    "Resource deleted successfully."
+//            );
+//
+//        } catch (Exception e) {
+//
+//            e.printStackTrace();   // TEMPORARY - to see actual cause
+//
+//            ra.addFlashAttribute(
+//                    "errorMessage",
+//                    "Unable to delete resource."
+//            );
+//        }
+//
+//        return "redirect:/admin/resources";
+//    }
+
+
     @PostMapping("/resources/delete/{id}")
-    public String deleteResource(@PathVariable Long id, RedirectAttributes ra) {
-        resourceRepo.findById(id).ifPresent(r -> {
-            resourceRepo.delete(r);
-            ra.addFlashAttribute("success", "Resource '" + r.getName() + "' deleted.");
-        });
+    public String deleteResource(
+            @PathVariable Long id,
+            RedirectAttributes ra) {
+
+        try {
+
+            Optional<com.timesheet.validator.domain.Resource> resourceOpt = resourceRepo.findById(id);
+
+            if (resourceOpt.isEmpty()) {
+
+                ra.addFlashAttribute(
+                        "errorMessage",
+                        "Unable to delete resource."
+                );
+
+                return "redirect:/admin/resources";
+            }
+
+            com.timesheet.validator.domain.Resource resource = resourceOpt.get();
+
+            /*
+             * Delete RESOURCE_SOW mappings first.
+             *
+             * RESOURCE_SOW references RESOURCE through RESOURCE_ID,
+             * so the mappings must be removed before deleting RESOURCE.
+             */
+            List<ResourceSow> mappings =
+                    resourceSowRepo.findByResourceId(
+                            resource.getResourceId()
+                    );
+
+            resourceSowRepo.deleteAll(mappings);
+
+            /*
+             * Now delete the actual resource.
+             */
+            resourceRepo.delete(resource);
+
+            ra.addFlashAttribute(
+                    "successMessage",
+                    "Resource deleted successfully."
+            );
+
+        } catch (Exception e) {
+
+            e.printStackTrace();
+
+            ra.addFlashAttribute(
+                    "errorMessage",
+                    "Unable to delete resource."
+            );
+        }
+
         return "redirect:/admin/resources";
     }
+
+
+    @GetMapping("/resources/sow/edit/{id}")
+    public String editSow(
+            @PathVariable Long id,
+            Model model) {
+
+        SowMaster sowMaster = sowMasterRepository.findById(id)
+                .orElseThrow(() ->
+                        new RuntimeException("SOW not found: " + id));
+
+        SowMasterEditDto dto = new SowMasterEditDto();
+
+        // =========================
+        // SOW_MASTER
+        // =========================
+
+        dto.setId(sowMaster.getId());
+        dto.setSowNumber(sowMaster.getSowNumber());
+        dto.setProject(sowMaster.getProject());
+        dto.setProjectLocation(sowMaster.getProjectLocation());
+        dto.setDescription(sowMaster.getDescription());
+        dto.setStartDate(sowMaster.getStartDate());
+        dto.setEndDate(sowMaster.getEndDate());
+        dto.setActive(sowMaster.getActive());
+
+
+        // =========================
+        // SOW_PO → PO_MASTER
+        // =========================
+
+        List<SowPo> mappings =
+                sowPoRepository.findBySowNumber(sowMaster.getSowNumber());
+
+        if (!mappings.isEmpty()) {
+
+            SowPo sowPo = mappings.get(0);
+
+            dto.setPoNumber(sowPo.getPoNumber());
+
+            poMasterRepository
+                    .findByPoNumber(sowPo.getPoNumber())
+                    .ifPresent(po -> {
+
+                        dto.setUpdatedPoNumber(po.getUpdatedPoNumber());
+                        dto.setPoValue(po.getPoValue());
+                        dto.setPoStartDate(po.getStartDate());
+                        dto.setPoEndDate(po.getEndDate());
+
+                    });
+        }
+
+
+        model.addAttribute("sow", dto);
+        model.addAttribute("editMode", true);
+
+        return "pages/admin/sow-form";
+    }
+
+    @PostMapping("/resources/sow/save")
+    public String saveSow(
+            @RequestParam Long id,
+            @RequestParam String sowNumber,
+            @RequestParam(required = false) String project,
+            @RequestParam(required = false) String projectLocation,
+            @RequestParam(required = false) String description,
+            @RequestParam(required = false)
+            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE)
+            LocalDate startDate,
+            @RequestParam(required = false)
+            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE)
+            LocalDate endDate,
+            @RequestParam(required = false) Boolean active,
+
+            @RequestParam(required = false) String poNumber,
+            @RequestParam(required = false) String updatedPoNumber,
+            @RequestParam(required = false) String poValue,
+            @RequestParam(required = false)
+            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE)
+            LocalDate poStartDate,
+            @RequestParam(required = false)
+            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE)
+            LocalDate poEndDate,
+
+            RedirectAttributes ra) {
+
+        SowMaster sow = sowMasterRepository.findById(id)
+                .orElseThrow(() ->
+                        new RuntimeException("SOW not found: " + id));
+
+        // =========================
+        // UPDATE SOW_MASTER
+        // =========================
+
+        sow.setProject(project);
+        sow.setProjectLocation(projectLocation);
+        sow.setDescription(description);
+        sow.setStartDate(startDate);
+        sow.setEndDate(endDate);
+        sow.setActive(active != null ? active : false);
+
+        sowMasterRepository.save(sow);
+
+
+        // =========================
+        // UPDATE PO INFORMATION
+        // =========================
+
+        List<SowPo> mappings =
+                sowPoRepository.findBySowNumber(sow.getSowNumber());
+
+        SowPo existingMapping =
+                mappings.isEmpty() ? null : mappings.get(0);
+
+        String oldPoNumber =
+                existingMapping != null
+                        ? existingMapping.getPoNumber()
+                        : null;
+
+
+        if (poNumber != null && !poNumber.isBlank()) {
+
+            poNumber = poNumber.trim();
+
+            // ---------------------------------
+            // PO number changed
+            // ---------------------------------
+
+            if (existingMapping == null) {
+
+                SowPo newMapping = new SowPo();
+
+                newMapping.setSowNumber(sow.getSowNumber());
+                newMapping.setPoNumber(poNumber);
+
+                sowPoRepository.save(newMapping);
+
+            } else if (!poNumber.equals(oldPoNumber)) {
+
+                existingMapping.setPoNumber(poNumber);
+
+                sowPoRepository.deleteById(
+                        new SowPoId(
+                                sow.getSowNumber(),
+                                oldPoNumber
+                        )
+                );
+
+                sowPoRepository.save(existingMapping);
+            }
+
+
+            // ---------------------------------
+            // Update / create PO_MASTER
+            // ---------------------------------
+
+            String finalPoNumber = poNumber;
+            PoMaster po = poMasterRepository
+                    .findByPoNumber(poNumber)
+                    .orElseGet(() -> {
+
+                        PoMaster newPo = new PoMaster();
+
+                        newPo.setPoNumber(finalPoNumber);
+
+                        return newPo;
+                    });
+
+            po.setUpdatedPoNumber(
+                    updatedPoNumber != null
+                            ? updatedPoNumber.trim()
+                            : null
+            );
+
+            if (poValue != null && !poValue.isBlank()) {
+                try {
+                    po.setPoValue(
+                            new BigDecimal(poValue.trim())
+                    );
+                } catch (NumberFormatException ignored) {
+                    // Keep existing value
+                }
+            } else {
+                po.setPoValue(null);
+            }
+
+            po.setStartDate(poStartDate);
+            po.setEndDate(poEndDate);
+
+            poMasterRepository.save(po);
+        }
+
+
+        ra.addFlashAttribute(
+                "successMessage",
+                "SOW '" + sow.getSowNumber() + "' updated successfully."
+        );
+
+        return "redirect:/admin/resources";
+    }
+
+    @PostMapping("/resources/sow/delete/{id}")
+    public String deleteSow(
+            @PathVariable Long id,
+            RedirectAttributes ra) {
+
+        sowMasterRepository.findById(id).ifPresent(sow -> {
+
+            String sowNumber = sow.getSowNumber();
+
+            // Delete SOW → PO mappings first
+            List<SowPo> mappings =
+                    sowPoRepository.findBySowNumber(sowNumber);
+
+            sowPoRepository.deleteAll(mappings);
+
+            // Delete SOW_MASTER
+            sowMasterRepository.delete(sow);
+
+            ra.addFlashAttribute(
+                    "successMessage",
+                    "SOW '" + sowNumber + "' deleted successfully."
+            );
+        });
+
+        return "redirect:/admin/resources";
+    }
+
+
+//    @PostMapping("/resources/sow/delete/{id}")
+//    public String deleteSow(
+//            @PathVariable Long id,
+//            RedirectAttributes ra) {
+//
+//        sowMasterRepository.findById(id).ifPresent(sow -> {
+//
+//            String sowNumber = sow.getSowNumber();
+//
+//            // Delete SOW → PO mappings
+//            List<SowPo> mappings =
+//                    sowPoRepository.findBySowNumber(sowNumber);
+//
+//            sowPoRepository.deleteAll(mappings);
+//
+//            // Delete SOW_MASTER
+//            sowMasterRepository.delete(sow);
+//
+//            ra.addFlashAttribute(
+//                    "successMessage",
+//                    "SOW '" + sowNumber + "' deleted successfully."
+//            );
+//        });
+//
+//        return "redirect:/admin/resources";
+//    }
+
 
     // ══════════════════════════════════════════════════════════════════════════
     // HOLIDAYS

@@ -1,0 +1,363 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="en">
+
+<head th:replace="fragments/layout :: head('Admin — SOW Form')"></head>
+
+<body>
+
+<nav th:replace="fragments/layout :: navbar"></nav>
+
+<main class="main-content" style="max-width:700px">
+
+    <!-- ============================================================
+         PAGE HEADER
+         ============================================================ -->
+
+    <div class="page-header">
+
+        <div>
+
+            <h1 th:text="${editMode} ? '✏ Edit SOW' : '➕ Add SOW'">
+                Edit SOW
+            </h1>
+
+            <p class="subtitle">
+                SOW master data
+            </p>
+
+        </div>
+
+        <a th:href="@{/admin/resources}"
+           class="btn btn-secondary">
+
+            <i class="fa fa-arrow-left"></i>
+            Back
+
+        </a>
+
+    </div>
+
+
+    <!-- ============================================================
+         SOW FORM
+         ============================================================ -->
+
+    <div class="card">
+
+        <div class="card-body">
+
+            <form th:action="@{/admin/resources/sow/save}"
+                  method="post">
+
+                <!-- =================================================
+                     HIDDEN ID
+                     ================================================= -->
+
+                <input type="hidden"
+                       name="id"
+                       th:value="${sow.id}"/>
+
+
+                <!-- =================================================
+                     SOW INFORMATION
+                     ================================================= -->
+
+                <div class="form-section">
+
+                    <div class="form-section-header">
+
+                        <i class="fa fa-file-contract"></i>
+                        SOW Information
+
+                    </div>
+
+
+                    <!-- SOW NUMBER + PROJECT -->
+
+                    <div class="form-row">
+
+                        <div class="form-group">
+
+                            <label class="required">
+                                SOW Number
+                            </label>
+
+                            <input type="text"
+                                   name="sowNumber"
+                                   class="form-input"
+                                   th:value="${sow.sowNumber}"
+                                   readonly/>
+
+                        </div>
+
+
+                        <div class="form-group">
+
+                            <label>
+                                Project
+                            </label>
+
+                            <input type="text"
+                                   name="project"
+                                   class="form-input"
+                                   th:value="${sow.project}"
+                                   placeholder="Project name"/>
+
+                        </div>
+
+                    </div>
+
+
+                    <!-- PROJECT LOCATION -->
+
+                    <div class="form-row">
+
+                        <div class="form-group">
+
+                            <label>
+                                Project Location
+                            </label>
+
+                            <input type="text"
+                                   name="projectLocation"
+                                   class="form-input"
+                                   th:value="${sow.projectLocation}"
+                                   placeholder="Project location"/>
+
+                        </div>
+
+
+                        <div class="form-group">
+
+                            <label>
+                                Active
+                            </label>
+
+                            <select name="active"
+                                    class="form-input">
+
+                                <option value="true"
+                                        th:selected="${sow.active == true}">
+                                    Active
+                                </option>
+
+                                <option value="false"
+                                        th:selected="${sow.active == false}">
+                                    Inactive
+                                </option>
+
+                            </select>
+
+                        </div>
+
+                    </div>
+
+
+                    <!-- SOW DESCRIPTION -->
+
+                    <div class="form-group">
+
+                        <label>
+                            SOW Description
+                        </label>
+
+                        <textarea name="description"
+                                  class="form-input"
+                                  rows="4"
+                                  placeholder="SOW description"
+                                  th:text="${sow.description}">
+                        </textarea>
+
+                    </div>
+
+
+                    <!-- SOW DATES -->
+
+                    <div class="form-row">
+
+                        <div class="form-group">
+
+                            <label>
+                                SOW Start Date
+                            </label>
+
+                            <input type="date"
+                                   name="startDate"
+                                   class="form-input"
+                                   th:value="${sow.startDate}"/>
+
+                        </div>
+
+
+                        <div class="form-group">
+
+                            <label>
+                                SOW End Date
+                            </label>
+
+                            <input type="date"
+                                   name="endDate"
+                                   class="form-input"
+                                   th:value="${sow.endDate}"/>
+
+                        </div>
+
+                    </div>
+
+                </div>
+
+
+                <!-- =================================================
+                     PURCHASE ORDER
+                     ================================================= -->
+
+                <div class="form-section">
+
+                    <div class="form-section-header">
+
+                        <i class="fa fa-file-invoice-dollar"></i>
+                        Purchase Order
+
+                    </div>
+
+
+                    <!-- PO NUMBER + UPDATED PO -->
+
+                    <div class="form-row">
+
+                        <div class="form-group">
+
+                            <label>
+                                PO #
+                            </label>
+
+                            <input type="text"
+                                   name="poNumber"
+                                   class="form-input"
+                                   th:value="${sow.poNumber}"
+                                   placeholder="PO Number"/>
+
+                        </div>
+
+
+                        <div class="form-group">
+
+                            <label>
+                                Updated PO #
+                            </label>
+
+                            <input type="text"
+                                   name="updatedPoNumber"
+                                   class="form-input"
+                                   th:value="${sow.updatedPoNumber}"
+                                   placeholder="Updated PO Number"/>
+
+                        </div>
+
+                    </div>
+
+
+                    <!-- PO VALUE + PO START DATE -->
+
+                    <div class="form-row">
+
+                        <div class="form-group">
+
+                            <label>
+                                PO Value
+                            </label>
+
+                            <input type="number"
+                                   name="poValue"
+                                   class="form-input"
+                                   th:value="${sow.poValue}"
+                                   placeholder="0.00"
+                                   step="0.01"
+                                   min="0"/>
+
+                        </div>
+
+
+                        <div class="form-group">
+
+                            <label>
+                                PO Start Date
+                            </label>
+
+                            <input type="date"
+                                   name="poStartDate"
+                                   class="form-input"
+                                   th:value="${sow.poStartDate}"/>
+
+                        </div>
+
+                    </div>
+
+
+                    <!-- PO END DATE -->
+
+                    <div class="form-row">
+
+                        <div class="form-group">
+
+                            <label>
+                                PO End Date
+                            </label>
+
+                            <input type="date"
+                                   name="poEndDate"
+                                   class="form-input"
+                                   th:value="${sow.poEndDate}"/>
+
+                        </div>
+
+                        <div class="form-group">
+                            <!-- Intentionally empty to preserve two-column layout -->
+                        </div>
+
+                    </div>
+
+                </div>
+
+
+                <!-- =================================================
+                     FORM ACTIONS
+                     ================================================= -->
+
+                <div class="form-actions">
+
+                    <button type="submit"
+                            class="btn btn-success">
+
+                        <i class="fa fa-save"></i>
+                        Save SOW
+
+                    </button>
+
+
+                    <a th:href="@{/admin/resources}"
+                       class="btn btn-secondary">
+
+                        Cancel
+
+                    </a>
+
+                </div>
+
+            </form>
+
+        </div>
+
+    </div>
+
+</main>
+
+
+<footer th:replace="fragments/layout :: footer"></footer>
+
+
+<script th:src="@{/js/app.js}"></script>
+
+</body>
+
+</html>
