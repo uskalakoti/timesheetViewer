@@ -13,7 +13,8 @@
 
     <groupId>com.timesheet</groupId>
     <artifactId>Timesheet-viewer</artifactId>
-    <version>1.0.0</version>
+<!--    <version>1.0.0</version>-->
+    <version>1.0.0-${author.name}</version>
     <packaging>jar</packaging>
     <name>Timesheet Validator</name>
     <description>Timesheet Viewer, Validator, Entry Form — Spring Security, H2, POI</description>
@@ -22,6 +23,7 @@
         <java.version>17</java.version>
         <poi.version>5.2.5</poi.version>
         <lombok.version>1.18.30</lombok.version>
+        <author.name>Jatin</author.name>
     </properties>
 
     <dependencies>

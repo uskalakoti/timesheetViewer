@@ -220,11 +220,11 @@ app:
 
     default-working-hours-per-day: 8.0
 
-    sow:
-      sow-number: SOW_18_2026
-      po-number: '3429004068'
-      po-value: 7000000
-      client: IGT
+#    sow:
+#      sow-number: SOW_18_2026
+#      po-number: '3429004068'
+#      po-value: 7000000
+#      client: IGT
 
 
     # ── Multi-SOW definitions ─────────────────────────────────────────────
