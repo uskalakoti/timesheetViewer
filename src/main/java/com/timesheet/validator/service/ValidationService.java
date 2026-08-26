@@ -955,9 +955,9 @@ public class ValidationService {
         if (isRuleEnabled(enabledRules, "TS-01")) {
             dailyHours.forEach((name, dateMap) ->
                     dateMap.forEach((date, total) -> {
-                                if (total != maxHours) {
+                                if (total > maxHours || (total != 4.0 && total != 8.0)) {
                                     issues.add(issue(sessionId, "TS-01", "CRITICAL", -1, 7, "Hours",
-                                            String.format("Resource '%s' logged %.1f hrs on %s (max %.0f hrs/day)", name, total, date, maxHours)));
+                                            String.format("Resource '%s' logged %.1f hrs on %s (max %.0f hrs/day, must be 4 or 8)", name, total, date, maxHours)));
                                 }
                             })
             );
