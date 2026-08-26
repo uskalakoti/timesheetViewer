@@ -1,5 +1,6 @@
 package com.timesheet.validator.controller;
 
+import com.timesheet.validator.domain.UploadProject;
 import com.timesheet.validator.domain.UploadSession;
 import com.timesheet.validator.config.RuleCatalog;
 import com.timesheet.validator.dto.SheetDto;
@@ -8,6 +9,7 @@ import com.timesheet.validator.repository.*;
 import com.timesheet.validator.service.*;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
@@ -29,6 +31,7 @@ public class MainController {
 
     private final ExcelParserService    parser;
     private final ValidationService     validator;
+    private final GeneralizedTimesheetTransformer transformer;
     private final SheetViewService      sheetView;
     private final UploadSessionRepository sessionRepo;
     private final ValidationIssueRepository issueRepo;
@@ -51,6 +54,7 @@ public class MainController {
     // ── Upload ────────────────────────────────────────────────────────────────
     @PostMapping("/upload")
     public String upload(@RequestParam("file") MultipartFile file,
+                         @RequestParam(value = "project", required = false) String project,
                          @RequestParam(value = "rules", required = false)
                          List<String> selectedRules,
                          RedirectAttributes ra) {
@@ -65,13 +69,34 @@ public class MainController {
             );
             return "redirect:/";
         }
+
+        // CR 5.1 — a project must be selected before a timesheet can be uploaded
+        UploadProject uploadProject = UploadProject.fromParam(project);
+        if (uploadProject == null) {
+            ra.addFlashAttribute(
+                    "error",
+                    "Please select a project (Sydney SoftDev or Generalized Timesheet) before uploading."
+            );
+            return "redirect:/";
+        }
+
         String name = file.getOriginalFilename();
         if (name == null || !name.toLowerCase().endsWith(".xlsx")) {
             ra.addFlashAttribute("error", "Only .xlsx files are supported.");
             return "redirect:/";
         }
         try {
-            String sessionId = parser.parse(file, selectedRules);
+            InputStream stream;
+            if (uploadProject == UploadProject.GENERALIZED_TIMESHEET) {
+                // CR 5.3 — transform the generalized workbook into the standard
+                // Sydney SoftDev structure so existing validations run unchanged.
+                byte[] transformed = transformer.transform(
+                        new XSSFWorkbook(file.getInputStream()), uploadProject);
+                stream = new java.io.ByteArrayInputStream(transformed);
+            } else {
+                stream = file.getInputStream();
+            }
+            String sessionId = parser.parse(name, stream, selectedRules, uploadProject);
             validator.validate(sessionId);
 //            ra.addFlashAttribute("success", "File uploaded! Session: " + sessionId.substring(0, 8) + "…");
             return "redirect:/view/" + sessionId;

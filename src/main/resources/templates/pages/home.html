@@ -28,8 +28,18 @@
     <div class="two-col">
         <!-- ── Upload Card ───────────────────────────────────────────────── -->
         <div class="card">
-            <div class="card-header">
-                <i class="fa fa-upload"></i> Upload Excel Workbook
+            <div class="card-header" style="display:flex;justify-content:space-between;align-items:center;gap:16px;">
+                <span><i class="fa fa-upload"></i>&nbsp; Upload Excel Workbook</span>
+                <!-- CR 5.1: project selection before timesheet upload -->
+                <span style="display:flex;align-items:center;gap:8px;white-space:nowrap;">
+                    <label for="projectSelect" style="margin:0;font-weight:600;font-size:.9rem;">Select Project:</label>
+                    <select id="projectSelect"
+                            style="padding:6px 10px;border-radius:8px;border:1px solid #cbd5e1;background:#fff;">
+                        <option value="" selected disabled>-- Select Project --</option>
+                        <option value="SYDNEY_SOFTDEV">Sydney SoftDev</option>
+                        <option value="GENERALIZED_TIMESHEET">Generalized Timesheet</option>
+                    </select>
+                </span>
             </div>
             <div class="card-body">
                 <div class="drop-zone" id="dropZone">
@@ -38,6 +48,13 @@
                     <p class="text-muted small">or click to browse</p>
                     <input type="file" id="fileInput" accept=".xlsx" style="display:none"/>
                     <p id="fileName" class="mt-2 selected-file"></p>
+                </div>
+
+                <!-- CR 5.2: informational banner while "Generalized Timesheet" is selected -->
+                <div id="generalizedBanner" class="alert alert-info mt-3" style="display:none;margin-bottom:0;">
+                    <i class="fa fa-circle-info"></i>
+                    ℹ️ The generalized timesheet will be transformed to the format of Sydney SoftDev
+                    and displayed for validation purposes.
                 </div>
                 <form id="uploadForm"
                       th:action="@{/upload}"
@@ -50,6 +67,9 @@
                            id="hiddenFile"
                            accept=".xlsx"
                            style="display:none"/>
+
+                    <!-- CR 5.1: selected project submitted with the upload -->
+                    <input type="hidden" name="project" id="projectInput"/>
 
 
                     <div class="validation-card mt-3 mb-3">
@@ -312,12 +332,17 @@
             </div>
             <table th:if="${!#lists.isEmpty(sessions)}" class="data-table">
                 <thead>
-                <tr><th>Session</th><th>File</th><th>Sheets</th><th>Uploaded</th><th>Status</th><th></th></tr>
+                <tr><th>Session</th><th>File</th><th>Project</th><th>Sheets</th><th>Uploaded</th><th>Status</th><th></th></tr>
                 </thead>
                 <tbody>
                 <tr th:each="s : ${sessions}">
                     <td><code th:text="${#strings.substring(s.sessionId,0,8) + '…'}"></code></td>
                     <td><i class="fa fa-file-excel text-green"></i> <span th:text="${s.fileName}"></span></td>
+                    <td>
+                        <span th:if="${s.uploadProject != null}" class="badge badge-blue"
+                              th:text="${s.uploadProject == 'GENERALIZED_TIMESHEET'} ? 'Generalized Timesheet' : 'Sydney SoftDev'">-</span>
+                        <span th:if="${s.uploadProject == null}" class="text-muted">-</span>
+                    </td>
                     <td th:text="${s.sheetCount}">0</td>
                     <td th:text="${#temporals.format(s.uploadedAt,'dd-MMM-yyyy HH:mm')}">-</td>
                     <td>
@@ -377,6 +402,10 @@
     const fileSelected =
         document.getElementById("hiddenFile").files.length > 0;
 
+    // CR 5.1 — a project must be selected before a timesheet can be uploaded
+    const projectSelected =
+        !!document.getElementById("projectSelect").value;
+
     const uploadBtn =
         document.getElementById("uploadBtn");
 
@@ -393,7 +422,43 @@
     }
 
     uploadBtn.disabled =
-        (checkedRules === 0 || !fileSelected);
+        (checkedRules === 0 || !fileSelected || !projectSelected);
+}
+
+/* ── CR 5.1 / 5.2: project selection, persistence and info banner ── */
+function updateProjectSelection(persist) {
+
+    const select = document.getElementById("projectSelect");
+    const hidden = document.getElementById("projectInput");
+    const banner = document.getElementById("generalizedBanner");
+
+    hidden.value = select.value || "";
+
+    // CR 5.2 — show the transformation info banner only while
+    // "Generalized Timesheet" is selected; hide on Sydney SoftDev.
+    if (banner) {
+        banner.style.display =
+            (select.value === "GENERALIZED_TIMESHEET") ? "block" : "none";
+    }
+
+    // CR 5.1 — remember the selection until the user changes it
+    if (persist && select.value) {
+        try { localStorage.setItem("selectedProject", select.value); } catch (e) { }
+    }
+
+    updateUploadButtonState();
+}
+
+function restoreProjectSelection() {
+    let saved = null;
+    try { saved = localStorage.getItem("selectedProject"); } catch (e) { }
+    const select = document.getElementById("projectSelect");
+    if (saved) {
+        for (const opt of select.options) {
+            if (opt.value === saved) { select.value = saved; break; }
+        }
+    }
+    updateProjectSelection(false);
 }
 
 // Refresh each group's "selected/total" count and its master switch.
@@ -497,6 +562,13 @@ function updateRuleCount() {
         document.getElementById("hiddenFile")
     .addEventListener("change", updateUploadButtonState);
 
+        // CR 5.1 / 5.2 — react to project selection changes
+        document.getElementById("projectSelect")
+            .addEventListener("change", function () {
+                updateProjectSelection(true);
+            });
+
+        restoreProjectSelection();
         updateRuleCount();
     });
 

@@ -12,4 +12,5 @@
     <include file="classpath:db/changelog/changes/008-cell-data-style-columns.xml"/>
     <include file="classpath:db/changelog/changes/009-sheetmeta-layout.xml"/>
     <include file="classpath:db/changelog/changes/010-leave-entry.xml"/>
+    <include file="classpath:db/changelog/changes/011-upload-session-project.xml"/>
 </databaseChangeLog>

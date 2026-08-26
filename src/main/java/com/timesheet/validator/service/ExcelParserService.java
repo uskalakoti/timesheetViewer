@@ -83,10 +83,22 @@ public class ExcelParserService {
 
     @Transactional
     public String parse(MultipartFile file, List<String> selectedRules) throws Exception {
-        String sessionId = UUID.randomUUID().toString();
-        log.info("[Parser] Starting parse for file={} session={}", file.getOriginalFilename(), sessionId);
+        return parse(file.getOriginalFilename(), file.getInputStream(), selectedRules, null);
+    }
 
-        try (InputStream is = file.getInputStream();
+    /**
+     * Parses workbook content from any source (used by the CR 5.3 transformation
+     * engine to feed transformed in-memory workbooks through the same pipeline).
+     *
+     * @param uploadProject project/template selected at upload time (CR 5.1); may be null for legacy callers
+     */
+    @Transactional
+    public String parse(String fileName, InputStream inputStream, List<String> selectedRules,
+                        com.timesheet.validator.domain.UploadProject uploadProject) throws Exception {
+        String sessionId = UUID.randomUUID().toString();
+        log.info("[Parser] Starting parse for file={} session={}", fileName, sessionId);
+
+        try (InputStream is = inputStream;
              Workbook wb = new XSSFWorkbook(is)) {
 
             FormulaEvaluator evaluator = wb.getCreationHelper().createFormulaEvaluator();
@@ -207,10 +219,11 @@ public class ExcelParserService {
             sessionRepo.save(
                     UploadSession.builder()
                             .sessionId(sessionId)
-                            .fileName(file.getOriginalFilename())
+                            .fileName(fileName)
                             .sheetCount(sheetCount)
                             .status("PARSED")
                             .enabledRules(enabledRules)
+                            .uploadProject(uploadProject != null ? uploadProject.name() : null)
                             .build()
             );
         }

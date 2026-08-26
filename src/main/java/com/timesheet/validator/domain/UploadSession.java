@@ -13,6 +13,9 @@ public class UploadSession {
     /** Phased validation: TIMESHEET (default) then PIVOT once Timesheet is clean. */
     @Column(name="VALIDATION_PHASE")
     private String validationPhase;
+    /** Project/template selected before upload: SYDNEY_SOFTDEV or GENERALIZED_TIMESHEET. */
+    @Column(name="UPLOAD_PROJECT", length = 50)
+    private String uploadProject;
     @PrePersist public void pre() {
         if(uploadedAt==null) uploadedAt=LocalDateTime.now();
         if(validationPhase==null) validationPhase="TIMESHEET";
