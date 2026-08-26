@@ -1,1 +1,10 @@
 target/
+
+AGENTS.md
+CLAUDE.md
+mvnw
+openwiki/
+*.docx
+.github
+maven-wrapper*
+*.xlsx
