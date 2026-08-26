@@ -1,5 +1,7 @@
 package com.timesheet.validator.domain;
 
+import java.time.DayOfWeek;
+import java.time.LocalDate;
 import java.util.Set;
 
 /**
@@ -64,5 +66,24 @@ public enum UploadProject {
         } catch (IllegalArgumentException e) {
             return null;
         }
+    }
+
+    /**
+     * Returns {@code true} when the upload format is {@link #GENERALIZED_TIMESHEET}
+     * and the entry is a structural weekend placeholder (zero hours on Saturday or
+     * Sunday). Such rows are an accepted artifact of the Timatic export and should
+     * not trigger TS-02 (weekend) or TS-04 (hours must be positive) violations.
+     *
+     * @param rawProject the persisted upload project string (safe to pass {@code null})
+     * @param hours      the row's parsed hours value
+     * @param date       the row's parsed date ({@code null} → returns {@code false})
+     * @return {@code true} if the checks should be suppressed for this row
+     */
+    public static boolean isStructuralWeekendZero(String rawProject, double hours, LocalDate date) {
+        if (fromParam(rawProject) != GENERALIZED_TIMESHEET || date == null || hours != 0.0) {
+            return false;
+        }
+        DayOfWeek dow = date.getDayOfWeek();
+        return dow == DayOfWeek.SATURDAY || dow == DayOfWeek.SUNDAY;
     }
 }

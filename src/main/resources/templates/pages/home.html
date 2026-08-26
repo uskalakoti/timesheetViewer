@@ -446,6 +446,25 @@ function updateProjectSelection(persist) {
         try { localStorage.setItem("selectedProject", select.value); } catch (e) { }
     }
 
+    // CR 5.x — hide the TS-02 (weekend) checkbox for generalized uploads;
+    // structural weekend-zero entries are accepted by design.
+    const isGeneralized = (select.value === "GENERALIZED_TIMESHEET");
+    document.querySelectorAll('#ruleGroups .rule-row').forEach(row => {
+        const badge = row.querySelector('.rule-badge');
+        if (badge && badge.textContent.trim() === 'TS-02') {
+            const cb = row.querySelector('input[name="rules"]');
+            if (isGeneralized) {
+                row.style.display = 'none';
+                if (cb) { cb.checked = false; cb.disabled = true; }
+            } else {
+                row.style.display = '';
+                if (cb) { cb.disabled = false; }
+            }
+        }
+    });
+    // Refresh group counts so the hidden TS-02 is not counted.
+    updateGroupStates();
+
     updateUploadButtonState();
 }
 

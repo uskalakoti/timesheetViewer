@@ -841,25 +841,41 @@ public class ValidationService {
 //                            " ParsedDate=" + date
 //            );
 
-            // TS-02: Weekend
+            // Parse hours early so TS-02 can reference the parsed value
+            double hours = 0;
+
+            if (!hoursStr.isBlank()) {
+
+                try {
+                    hours = Double.parseDouble(hoursStr.trim());
+
+                } catch (NumberFormatException e) {
+
+                    if (isRuleEnabled(enabledRules, "TS-04")) {
+
+                        issues.add(issue(
+                                sessionId,
+                                "TS-04",
+                                "CRITICAL",
+                                ri,
+                                7,
+                                "Hours",
+                                "Invalid hours value: '" + hoursStr + "'"
+                        ));
+                    }
+                }
+            }
+
+            // TS-02: Weekend (structural weekend-zero entries exempt for generalized)
             if (isRuleEnabled(enabledRules, "TS-02")
                     && date != null
-                    && !props.getValidation().isAllowWeekendOverride()) {
-
-//                System.out.println(
-//                        "Checking weekend for " +
-//                                date +
-//                                " Day=" +
-//                                date.getDayOfWeek()
-//                );
+                    && !props.getValidation().isAllowWeekendOverride()
+                    && !UploadProject.isStructuralWeekendZero(session.getUploadProject(), hours, date)) {
 
                 DayOfWeek dow = date.getDayOfWeek();
 
 
-
                 if (dow == DayOfWeek.SATURDAY || dow == DayOfWeek.SUNDAY) {
-
-//                    System.out.println("WEEKEND FOUND");
 
                     issues.add(issue(sessionId,"TS-02","CRITICAL",ri,0,"Date",
                         "Weekend entry not allowed: " + rawDate + " (" + dow + ") for resource '" + name + "'"));
@@ -877,44 +893,22 @@ public class ValidationService {
                     "Entry on public holiday '" + hName + "': " + rawDate + " for resource '" + name + "'"));
             }
 
-            // TS-04: Hours positive
-            double hours = 0;
+            // TS-04: Hours must be positive (structural weekend-zero entries exempt for generalized)
+            if (isRuleEnabled(enabledRules, "TS-04")
+                    && !hoursStr.isBlank()
+                    && hours <= 0
+                    && !UploadProject.isStructuralWeekendZero(session.getUploadProject(), hours, date)) {
 
-            if (!hoursStr.isBlank()) {
-
-                try {
-                    hours = Double.parseDouble(hoursStr.trim());
-
-                    if (isRuleEnabled(enabledRules, "TS-04")
-                            && hours <= 0) {
-
-                        issues.add(issue(
-                                sessionId,
-                                "TS-04",
-                                "CRITICAL",
-                                ri,
-                                7,
-                                "Hours",
-                                "Hours must be positive, got: " + hoursStr +
-                                        " for resource '" + name + "'"
-                        ));
-                    }
-
-                } catch (NumberFormatException e) {
-
-                    if (isRuleEnabled(enabledRules, "TS-04")) {
-
-                        issues.add(issue(
-                                sessionId,
-                                "TS-04",
-                                "CRITICAL",
-                                ri,
-                                7,
-                                "Hours",
-                                "Invalid hours value: '" + hoursStr + "'"
-                        ));
-                    }
-                }
+                issues.add(issue(
+                        sessionId,
+                        "TS-04",
+                        "CRITICAL",
+                        ri,
+                        7,
+                        "Hours",
+                        "Hours must be positive, got: " + hoursStr +
+                                " for resource '" + name + "'"
+                ));
             }
 
             // TS-05: Known resource

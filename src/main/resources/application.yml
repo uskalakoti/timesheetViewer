@@ -421,7 +421,7 @@ app:
       max-hours-per-day: 8.0
       default-working-hours-per-day: 8.0
       allow-weekend-override: false
-      expected-sow: SOW_18_2026
+      expected-sow: SOW_19_2026
       # Configurable reasons for weekend override checkbox — add/remove and restart
       weekendOverrideReasons:
         - "Production incident / on-call support"
