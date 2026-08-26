@@ -191,6 +191,16 @@ public class MainController {
         // row/col counts). The grids themselves are fetched per tab via
         // /api/view/{sessionId}/sheet/{index}.
         var metas = sheetView.getSheetMetas(sessionId);
+
+        // Generalized uploads have no Pivot / Projectwise stages — hide their tabs.
+        if (UploadProject.GENERALIZED_TIMESHEET.name()
+                .equalsIgnoreCase(session.getUploadProject())) {
+            metas = metas.stream()
+                    .filter(m -> !"Pivot".equalsIgnoreCase(m.getSheetName())
+                            && !"Projectwise".equalsIgnoreCase(m.getSheetName()))
+                    .toList();
+        }
+
         model.addAttribute("sheetMetas",    metas);
 
         // ── Phased validation state ──────────────────────────────────────────
@@ -231,6 +241,9 @@ public class MainController {
             .orElse(-1);
 
         model.addAttribute("validationPhase",     phase);
+        model.addAttribute("generalizedUpload",
+                UploadProject.GENERALIZED_TIMESHEET.name()
+                        .equalsIgnoreCase(session.getUploadProject()));
         model.addAttribute("pivotUnlocked",       pivotUnlocked);
         model.addAttribute("pivotErrors", pivotErrors);
         model.addAttribute("timesheetErrors",     timesheetErrors);
@@ -310,9 +323,14 @@ public class MainController {
 
         String phase = session.getValidationPhase();
 
+        boolean generalizedUpload = UploadProject.GENERALIZED_TIMESHEET.name()
+                .equalsIgnoreCase(session.getUploadProject());
+
         /*
         * ===========================================================
         * TIMESHEET  ->  PIVOT
+        * (generalized uploads skip straight to SUMMARY: the Pivot
+        *  and Projectwise stages are not applicable to that format)
         * ===========================================================
         */
         if ("TIMESHEET".equalsIgnoreCase(phase)) {
@@ -326,31 +344,35 @@ public class MainController {
 
                 ra.addFlashAttribute(
                         "error",
-                        "Cannot proceed to Pivot validation — resolve "
+                        "Cannot proceed to " + (generalizedUpload ? "Summary" : "Pivot")
+                                + " validation — resolve "
                                 + tsErrors
                                 + " unresolved Timesheet error(s) first.");
 
                 return "redirect:/view/" + sessionId;
             }
 
-            session.setValidationPhase("PIVOT");
+            String nextPhase = generalizedUpload ? "SUMMARY" : "PIVOT";
+            session.setValidationPhase(nextPhase);
             sessionRepo.save(session);
 
             ValidationResultDto result = validator.validate(sessionId);
 
             if (result.getErrorCount() > 0) {   // CR 4.3: banner only when an error is found
                 ra.addFlashAttribute("error",
-                        "Pivot validation found " + result.getErrorCount() + " error(s).");
+                        (generalizedUpload ? "Summary" : "Pivot") + " validation found "
+                                + result.getErrorCount() + " error(s).");
             }
 
-            int pivotTab = sheetView.getSheetMetas(sessionId)
+            String targetSheet = generalizedUpload ? "Summary" : "Pivot";
+            int targetTab = sheetView.getSheetMetas(sessionId)
                     .stream()
-                    .filter(m -> "Pivot".equalsIgnoreCase(m.getSheetName()))
+                    .filter(m -> targetSheet.equalsIgnoreCase(m.getSheetName()))
                     .map(m -> m.getSheetIndex())
                     .filter(java.util.Objects::nonNull)
                     .findFirst().orElse(0);
 
-            return "redirect:/view/" + sessionId + "?tab=" + pivotTab;
+            return "redirect:/view/" + sessionId + "?tab=" + targetTab;
         }
 
         /*
@@ -485,8 +507,11 @@ public class MainController {
                 .orElseThrow(() -> new RuntimeException("Session not found"));
         String currentPhase = session.getValidationPhase();
         String targetPhase;
+        boolean generalizedUpload = UploadProject.GENERALIZED_TIMESHEET.name()
+                .equalsIgnoreCase(session.getUploadProject());
         if ("SUMMARY".equalsIgnoreCase(currentPhase)) {
-            targetPhase = "PROJECT_WISE";
+            // Generalized uploads have no Pivot/Projectwise stages behind Summary
+            targetPhase = generalizedUpload ? "TIMESHEET" : "PROJECT_WISE";
         } else if ("COMMERCIAL".equalsIgnoreCase(currentPhase)) {
             targetPhase = "SUMMARY";
         } else if ("PROJECT_WISE".equalsIgnoreCase(currentPhase)) {

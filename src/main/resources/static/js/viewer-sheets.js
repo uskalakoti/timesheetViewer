@@ -193,6 +193,7 @@
         else if (isCrit)      cls = 'excel-cell cell-error';
         else if (isWarn)      cls = 'excel-cell cell-warning';
         else if (formula)     cls = 'excel-cell cell-formula';
+        if (cell.notApplicable) cls += ' na-cell';
 
         var title = formula ? formula : (hasMsgs ? msgs.join(' | ') : '');
 

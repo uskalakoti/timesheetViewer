@@ -226,6 +226,10 @@ kbd { background: #f0f0f0; border: 1px solid #ccc; padding: 1px 5px;
 
 .cell-content { display: block; overflow: hidden; text-overflow: ellipsis; max-width: 200px; }
 
+/* Not-applicable cells: fields this upload format doesn't carry — muted so they fade back */
+.na-cell { background-color: #FAFAFB; }
+.na-cell .cell-content { color: #A0AEC0; }
+
 /* ── Custom Tooltip ─────────────────────────────────────────────────────────── */
 .cell-tooltip { display: none; position: absolute; left: 0; top: 100%;
                 background: #1e293b; color: #fff; border-radius: 6px;

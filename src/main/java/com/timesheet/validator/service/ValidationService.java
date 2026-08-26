@@ -1,6 +1,7 @@
 package com.timesheet.validator.service;
 
 import com.timesheet.validator.config.RuleCatalog;
+import com.timesheet.validator.domain.UploadProject;
 import com.timesheet.validator.domain.UploadSession;
 import com.timesheet.validator.repository.UploadSessionRepository;
 import com.timesheet.validator.config.AppProperties;
@@ -115,6 +116,12 @@ public class ValidationService {
         }
 
 //        log.info("ENABLED RULES = {}", enabledRules);
+
+        // Format applicability (CR: generalized formats): columns the source
+        // format does not carry are excluded from mandatory-field checks (TS-08)
+        // instead of being flagged as errors.
+        Set<Integer> naTimesheetColumns =
+                UploadProject.naTimesheetColumnsOf(session.getUploadProject());
 
         List<CellData> allCells = cellRepo
             .findBySessionIdAndSheetNameOrderByRowIdxAscColIdxAsc(sessionId, SHEET);
@@ -801,6 +808,9 @@ public class ValidationService {
             if (isRuleEnabled(enabledRules, "TS-08")) {
 
                 for (int col = 0; col < fieldNames.length; col++) {
+
+                    // Skip fields that do not exist in this upload format
+                    if (naTimesheetColumns.contains(col)) continue;
 
                     String value = val(cols, col);
 

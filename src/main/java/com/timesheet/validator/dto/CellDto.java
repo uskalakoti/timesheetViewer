@@ -20,6 +20,9 @@ public class CellDto {
     private String highestSeverity;
     private boolean employeeIssue;
 
+    /** True when this field does not exist in the uploaded format (rendered muted). */
+    private Boolean notApplicable;
+
     /*
      * Excel styling information.
      */

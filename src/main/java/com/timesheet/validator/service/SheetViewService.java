@@ -2,12 +2,15 @@ package com.timesheet.validator.service;
 
 import com.timesheet.validator.domain.CellData;
 import com.timesheet.validator.domain.SheetMeta;
+import com.timesheet.validator.domain.UploadProject;
+import com.timesheet.validator.domain.UploadSession;
 import com.timesheet.validator.domain.ValidationIssue;
 import com.timesheet.validator.dto.CellDto;
 import com.timesheet.validator.dto.MergedRegionDto;
 import com.timesheet.validator.dto.SheetDto;
 import com.timesheet.validator.repository.CellDataRepository;
 import com.timesheet.validator.repository.SheetMetaRepository;
+import com.timesheet.validator.repository.UploadSessionRepository;
 import com.timesheet.validator.repository.ValidationIssueRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -27,6 +30,7 @@ public class SheetViewService {
     private final SheetMetaRepository sheetMetaRepo;
     private final CellDataRepository cellDataRepo;
     private final ValidationIssueRepository issueRepo;
+    private final UploadSessionRepository uploadSessionRepo;
 
     private final ObjectMapper objectMapper = new ObjectMapper();
 
@@ -37,12 +41,14 @@ public class SheetViewService {
     public List<SheetDto> getSheets(String sessionId) {
         List<SheetMeta> metas = sheetMetaRepo.findBySessionIdOrderBySheetIndex(sessionId);
 
+        Set<Integer> naTimesheetColumns = naTimesheetColumnsFor(sessionId);
+
         // Build an issue lookup: sheetName → rowIdx → colIdx → issue
         Map<String, Map<Integer, Map<Integer, List<ValidationIssue>>>> issueMap = buildIssueMap(sessionId);
 
         List<SheetDto> result = new ArrayList<>();
         for (SheetMeta meta : metas) {
-            result.add(buildSheet(sessionId, meta, issueMap));
+            result.add(buildSheet(sessionId, meta, issueMap, naTimesheetColumns));
         }
         return result;
     }
@@ -57,11 +63,23 @@ public class SheetViewService {
                 .findFirst()
                 .orElseThrow(() -> new RuntimeException(
                         "Sheet index " + sheetIndex + " not found for session " + sessionId));
-        return buildSheet(sessionId, meta, buildIssueMap(sessionId));
+        Set<Integer> naTimesheetColumns = naTimesheetColumnsFor(sessionId);
+        return buildSheet(sessionId, meta, buildIssueMap(sessionId), naTimesheetColumns);
+    }
+
+    /**
+     * Columns of the normalized Timesheet grid that this session's upload
+     * format does not carry (rendered as "Not Applicable", excluded from validation).
+     */
+    private Set<Integer> naTimesheetColumnsFor(String sessionId) {
+        return uploadSessionRepo.findBySessionId(sessionId)
+                .map(s -> UploadProject.naTimesheetColumnsOf(s.getUploadProject()))
+                .orElse(Set.of());
     }
 
     private SheetDto buildSheet(String sessionId, SheetMeta meta,
-                               Map<String, Map<Integer, Map<Integer, List<ValidationIssue>>>> issueMap) {
+                               Map<String, Map<Integer, Map<Integer, List<ValidationIssue>>>> issueMap,
+                               Set<Integer> naTimesheetColumns) {
             List<CellData> cells = cellDataRepo
                     .findBySessionIdAndSheetNameOrderByRowIdxAscColIdxAsc(sessionId, meta.getSheetName());
 
@@ -186,6 +204,16 @@ public class SheetViewService {
 
                 // existing cell creation code stays exactly the same
                 String display = c != null ? nvl(c.getDisplayValue()) : "";
+
+                // Fields absent from the source format render as "Not Applicable"
+                boolean notApplicableCell = false;
+                if ("Timesheet".equalsIgnoreCase(meta.getSheetName())
+                        && display.isBlank()
+                        && naTimesheetColumns.contains(ci)) {
+                    display = "Not Applicable";
+                    notApplicableCell = true;
+                }
+
                 String formula = c != null ? c.getFormula() : null;
                 String type    = c != null ? nvl(c.getCellType()) : "BLANK";
                 boolean header = c != null && Boolean.TRUE.equals(c.getIsHeader());
@@ -236,6 +264,7 @@ public class SheetViewService {
                         .fontColor(c != null ? c.getFontColor() : null)
                         .fontSize(c != null ? c.getFontSize() : null)
                         .bold(c != null && Boolean.TRUE.equals(c.getBold()))
+                        .notApplicable(notApplicableCell)
                         .italic(c != null && Boolean.TRUE.equals(c.getItalic()))
                         .horizontalAlignment(c != null ? c.getHorizontalAlignment() : null)
                         .verticalAlignment(c != null ? c.getVerticalAlignment() : null)
