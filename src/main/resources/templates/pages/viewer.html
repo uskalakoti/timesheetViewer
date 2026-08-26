@@ -16,6 +16,15 @@
             <p class="subtitle">
                 <span th:text="${uploadSession.sheetCount}">0</span> sheets
                 &bull; Uploaded: <span th:text="${#temporals.format(uploadSession.uploadedAt,'dd-MMM-yyyy HH:mm')}"></span>
+                <span th:if="${uploadSession.uploadProject != null}"
+                      class="badge badge-blue"
+                      style="margin-left:8px;vertical-align:middle;">
+                    <i class="fa fa-diagram-project"></i>
+                    Project: <span
+                        th:text="${uploadSession.uploadProject == 'GENERALIZED_TIMESHEET'} ? 'Generalized Timesheet' : 'Sydney SoftDev'">Sydney SoftDev</span>
+                    <span th:if="${uploadSession.uploadProject == 'GENERALIZED_TIMESHEET'}">
+                        (transformed to Sydney SoftDev format)</span>
+                </span>
             </p>
         </div>
         <div class="page-actions">
@@ -340,7 +349,8 @@
         <div class="phase-connector"
             th:classappend="${pivotUnlocked} ? ' done' : ''"></div>
 
-        <!-- Step 2 -->
+        <!-- Step 2 (hidden for generalized uploads: Pivot stage not applicable) -->
+        <th:block th:if="${!generalizedUpload}">
         <div class="phase-step"
             th:classappend="${projectWiseUnlocked} ? ' done' :
                             (${pivotUnlocked} ? ' active' : ' locked')">
@@ -362,11 +372,13 @@
             <span>Pivot validation</span>
 
         </div>
+        </th:block>
 
+        <th:block th:if="${!generalizedUpload}">
         <div class="phase-connector"
             th:classappend="${projectWiseUnlocked} ? ' done' : ''"></div>
 
-        <!-- Step 3 -->
+        <!-- Step 3 (hidden for generalized uploads: Projectwise stage not applicable) -->
         <div class="phase-step"
             th:classappend="${summaryUnlocked} ? ' done' :
                             (${projectWiseUnlocked} ? ' active' : ' locked')">
@@ -388,9 +400,12 @@
             <span>Projectwise validation</span>
 
         </div>
+        </th:block>
 
+        <th:block th:if="${!generalizedUpload}">
         <div class="phase-connector"
             th:classappend="${summaryUnlocked} ? ' done' : ''"></div>
+        </th:block>
 
         <!-- Step 4 -->
         <div class="phase-step"
@@ -405,9 +420,8 @@
                 <i th:if="${!summaryUnlocked}"
                 class="fa fa-lock"></i>
 
-                <span th:if="${summaryUnlocked and !commercialUnlocked}">
-                    4
-                </span>
+                <span th:if="${summaryUnlocked and !commercialUnlocked}"
+                      th:text="${generalizedUpload} ? 2 : 4">4</span>
 
             </span>
 
@@ -430,9 +444,8 @@
                 <i th:if="${!commercialUnlocked}"
                 class="fa fa-lock"></i>
 
-                <span th:if="${commercialUnlocked and commercialErrors > 0}">
-                    5
-                </span>
+                <span th:if="${commercialUnlocked and commercialErrors > 0}"
+                      th:text="${generalizedUpload} ? 3 : 5">5</span>
 
             </span>
 
@@ -464,7 +477,7 @@
                             type="submit"
                             th:disabled="${timesheetErrors > 0}">
 
-                        Proceed to Pivot
+                        <span th:text="${generalizedUpload} ? 'Proceed to Summary' : 'Proceed to Pivot'">Proceed to Pivot</span>
                         <i class="fa fa-arrow-right"></i>
 
                     </button>
@@ -587,7 +600,7 @@
 
                         <i class="fa fa-arrow-left"></i>
 
-                        Back to Projectwise
+                        <span th:text="${generalizedUpload} ? 'Back to Timesheet' : 'Back to Projectwise'">Back to Projectwise</span>
 
                     </button>
 
@@ -646,7 +659,7 @@
     <div class="sheet-tabs-wrapper">
         <div class="sheet-tabs" id="sheetTabs">
            <button th:each="meta, iStat : ${sheetMetas}"
-                    th:id="'tab-btn-' + ${iStat.index}"
+                    th:id="'tab-btn-' + ${meta.sheetIndex}"
 
                     th:with="
                         pivotLocked=${#strings.equalsIgnoreCase(meta.sheetName,'Pivot') and !pivotUnlocked},
@@ -656,14 +669,14 @@
                         locked=${pivotLocked or projectWiseLocked or summaryLocked or commercialLocked}
                     "
 
-                    th:class="${iStat.index == activeTab} ? 'sheet-tab active' : 'sheet-tab'"
+                    th:class="${meta.sheetIndex == activeTab} ? 'sheet-tab active' : 'sheet-tab'"
                     th:classappend="${locked} ? ' sheet-tab-locked' : ''"
 
-                    th:attr="data-index=${iStat.index}"
+                    th:attr="data-index=${meta.sheetIndex}"
 
                     th:onclick="${locked}
                         ? 'lockedPhaseClick()'
-                        : ('loadSheet(' + ${iStat.index} + ')')">
+                        : ('loadSheet(' + ${meta.sheetIndex} + ')')">
 
                 <span th:text="${meta.sheetName}">Sheet</span>
 

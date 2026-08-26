@@ -1,5 +1,6 @@
 package com.timesheet.validator.controller;
 
+import com.timesheet.validator.domain.UploadProject;
 import com.timesheet.validator.domain.UploadSession;
 import com.timesheet.validator.config.RuleCatalog;
 import com.timesheet.validator.dto.SheetDto;
@@ -8,6 +9,7 @@ import com.timesheet.validator.repository.*;
 import com.timesheet.validator.service.*;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
@@ -29,6 +31,7 @@ public class MainController {
 
     private final ExcelParserService    parser;
     private final ValidationService     validator;
+    private final GeneralizedTimesheetTransformer transformer;
     private final SheetViewService      sheetView;
     private final UploadSessionRepository sessionRepo;
     private final ValidationIssueRepository issueRepo;
@@ -51,6 +54,7 @@ public class MainController {
     // ── Upload ────────────────────────────────────────────────────────────────
     @PostMapping("/upload")
     public String upload(@RequestParam("file") MultipartFile file,
+                         @RequestParam(value = "project", required = false) String project,
                          @RequestParam(value = "rules", required = false)
                          List<String> selectedRules,
                          RedirectAttributes ra) {
@@ -65,13 +69,34 @@ public class MainController {
             );
             return "redirect:/";
         }
+
+        // CR 5.1 — a project must be selected before a timesheet can be uploaded
+        UploadProject uploadProject = UploadProject.fromParam(project);
+        if (uploadProject == null) {
+            ra.addFlashAttribute(
+                    "error",
+                    "Please select a project (Sydney SoftDev or Generalized Timesheet) before uploading."
+            );
+            return "redirect:/";
+        }
+
         String name = file.getOriginalFilename();
         if (name == null || !name.toLowerCase().endsWith(".xlsx")) {
             ra.addFlashAttribute("error", "Only .xlsx files are supported.");
             return "redirect:/";
         }
         try {
-            String sessionId = parser.parse(file, selectedRules);
+            InputStream stream;
+            if (uploadProject == UploadProject.GENERALIZED_TIMESHEET) {
+                // CR 5.3 — transform the generalized workbook into the standard
+                // Sydney SoftDev structure so existing validations run unchanged.
+                byte[] transformed = transformer.transform(
+                        new XSSFWorkbook(file.getInputStream()), uploadProject);
+                stream = new java.io.ByteArrayInputStream(transformed);
+            } else {
+                stream = file.getInputStream();
+            }
+            String sessionId = parser.parse(name, stream, selectedRules, uploadProject);
             validator.validate(sessionId);
 //            ra.addFlashAttribute("success", "File uploaded! Session: " + sessionId.substring(0, 8) + "…");
             return "redirect:/view/" + sessionId;
@@ -166,6 +191,16 @@ public class MainController {
         // row/col counts). The grids themselves are fetched per tab via
         // /api/view/{sessionId}/sheet/{index}.
         var metas = sheetView.getSheetMetas(sessionId);
+
+        // Generalized uploads have no Pivot / Projectwise stages — hide their tabs.
+        if (UploadProject.GENERALIZED_TIMESHEET.name()
+                .equalsIgnoreCase(session.getUploadProject())) {
+            metas = metas.stream()
+                    .filter(m -> !"Pivot".equalsIgnoreCase(m.getSheetName())
+                            && !"Projectwise".equalsIgnoreCase(m.getSheetName()))
+                    .toList();
+        }
+
         model.addAttribute("sheetMetas",    metas);
 
         // ── Phased validation state ──────────────────────────────────────────
@@ -206,6 +241,9 @@ public class MainController {
             .orElse(-1);
 
         model.addAttribute("validationPhase",     phase);
+        model.addAttribute("generalizedUpload",
+                UploadProject.GENERALIZED_TIMESHEET.name()
+                        .equalsIgnoreCase(session.getUploadProject()));
         model.addAttribute("pivotUnlocked",       pivotUnlocked);
         model.addAttribute("pivotErrors", pivotErrors);
         model.addAttribute("timesheetErrors",     timesheetErrors);
@@ -285,9 +323,14 @@ public class MainController {
 
         String phase = session.getValidationPhase();
 
+        boolean generalizedUpload = UploadProject.GENERALIZED_TIMESHEET.name()
+                .equalsIgnoreCase(session.getUploadProject());
+
         /*
         * ===========================================================
         * TIMESHEET  ->  PIVOT
+        * (generalized uploads skip straight to SUMMARY: the Pivot
+        *  and Projectwise stages are not applicable to that format)
         * ===========================================================
         */
         if ("TIMESHEET".equalsIgnoreCase(phase)) {
@@ -301,31 +344,35 @@ public class MainController {
 
                 ra.addFlashAttribute(
                         "error",
-                        "Cannot proceed to Pivot validation — resolve "
+                        "Cannot proceed to " + (generalizedUpload ? "Summary" : "Pivot")
+                                + " validation — resolve "
                                 + tsErrors
                                 + " unresolved Timesheet error(s) first.");
 
                 return "redirect:/view/" + sessionId;
             }
 
-            session.setValidationPhase("PIVOT");
+            String nextPhase = generalizedUpload ? "SUMMARY" : "PIVOT";
+            session.setValidationPhase(nextPhase);
             sessionRepo.save(session);
 
             ValidationResultDto result = validator.validate(sessionId);
 
             if (result.getErrorCount() > 0) {   // CR 4.3: banner only when an error is found
                 ra.addFlashAttribute("error",
-                        "Pivot validation found " + result.getErrorCount() + " error(s).");
+                        (generalizedUpload ? "Summary" : "Pivot") + " validation found "
+                                + result.getErrorCount() + " error(s).");
             }
 
-            int pivotTab = sheetView.getSheetMetas(sessionId)
+            String targetSheet = generalizedUpload ? "Summary" : "Pivot";
+            int targetTab = sheetView.getSheetMetas(sessionId)
                     .stream()
-                    .filter(m -> "Pivot".equalsIgnoreCase(m.getSheetName()))
+                    .filter(m -> targetSheet.equalsIgnoreCase(m.getSheetName()))
                     .map(m -> m.getSheetIndex())
                     .filter(java.util.Objects::nonNull)
                     .findFirst().orElse(0);
 
-            return "redirect:/view/" + sessionId + "?tab=" + pivotTab;
+            return "redirect:/view/" + sessionId + "?tab=" + targetTab;
         }
 
         /*
@@ -460,8 +507,11 @@ public class MainController {
                 .orElseThrow(() -> new RuntimeException("Session not found"));
         String currentPhase = session.getValidationPhase();
         String targetPhase;
+        boolean generalizedUpload = UploadProject.GENERALIZED_TIMESHEET.name()
+                .equalsIgnoreCase(session.getUploadProject());
         if ("SUMMARY".equalsIgnoreCase(currentPhase)) {
-            targetPhase = "PROJECT_WISE";
+            // Generalized uploads have no Pivot/Projectwise stages behind Summary
+            targetPhase = generalizedUpload ? "TIMESHEET" : "PROJECT_WISE";
         } else if ("COMMERCIAL".equalsIgnoreCase(currentPhase)) {
             targetPhase = "SUMMARY";
         } else if ("PROJECT_WISE".equalsIgnoreCase(currentPhase)) {

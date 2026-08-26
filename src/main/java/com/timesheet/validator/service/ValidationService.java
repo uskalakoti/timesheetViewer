@@ -1,6 +1,7 @@
 package com.timesheet.validator.service;
 
 import com.timesheet.validator.config.RuleCatalog;
+import com.timesheet.validator.domain.UploadProject;
 import com.timesheet.validator.domain.UploadSession;
 import com.timesheet.validator.repository.UploadSessionRepository;
 import com.timesheet.validator.config.AppProperties;
@@ -115,6 +116,12 @@ public class ValidationService {
         }
 
 //        log.info("ENABLED RULES = {}", enabledRules);
+
+        // Format applicability (CR: generalized formats): columns the source
+        // format does not carry are excluded from mandatory-field checks (TS-08)
+        // instead of being flagged as errors.
+        Set<Integer> naTimesheetColumns =
+                UploadProject.naTimesheetColumnsOf(session.getUploadProject());
 
         List<CellData> allCells = cellRepo
             .findBySessionIdAndSheetNameOrderByRowIdxAscColIdxAsc(sessionId, SHEET);
@@ -802,6 +809,9 @@ public class ValidationService {
 
                 for (int col = 0; col < fieldNames.length; col++) {
 
+                    // Skip fields that do not exist in this upload format
+                    if (naTimesheetColumns.contains(col)) continue;
+
                     String value = val(cols, col);
 
                     if (value.isBlank()) {
@@ -831,25 +841,41 @@ public class ValidationService {
 //                            " ParsedDate=" + date
 //            );
 
-            // TS-02: Weekend
+            // Parse hours early so TS-02 can reference the parsed value
+            double hours = 0;
+
+            if (!hoursStr.isBlank()) {
+
+                try {
+                    hours = Double.parseDouble(hoursStr.trim());
+
+                } catch (NumberFormatException e) {
+
+                    if (isRuleEnabled(enabledRules, "TS-04")) {
+
+                        issues.add(issue(
+                                sessionId,
+                                "TS-04",
+                                "CRITICAL",
+                                ri,
+                                7,
+                                "Hours",
+                                "Invalid hours value: '" + hoursStr + "'"
+                        ));
+                    }
+                }
+            }
+
+            // TS-02: Weekend (structural weekend-zero entries exempt for generalized)
             if (isRuleEnabled(enabledRules, "TS-02")
                     && date != null
-                    && !props.getValidation().isAllowWeekendOverride()) {
-
-//                System.out.println(
-//                        "Checking weekend for " +
-//                                date +
-//                                " Day=" +
-//                                date.getDayOfWeek()
-//                );
+                    && !props.getValidation().isAllowWeekendOverride()
+                    && !UploadProject.isStructuralWeekendZero(session.getUploadProject(), hours, date)) {
 
                 DayOfWeek dow = date.getDayOfWeek();
 
 
-
                 if (dow == DayOfWeek.SATURDAY || dow == DayOfWeek.SUNDAY) {
-
-//                    System.out.println("WEEKEND FOUND");
 
                     issues.add(issue(sessionId,"TS-02","CRITICAL",ri,0,"Date",
                         "Weekend entry not allowed: " + rawDate + " (" + dow + ") for resource '" + name + "'"));
@@ -867,44 +893,22 @@ public class ValidationService {
                     "Entry on public holiday '" + hName + "': " + rawDate + " for resource '" + name + "'"));
             }
 
-            // TS-04: Hours positive
-            double hours = 0;
+            // TS-04: Hours must be positive (structural weekend-zero entries exempt for generalized)
+            if (isRuleEnabled(enabledRules, "TS-04")
+                    && !hoursStr.isBlank()
+                    && hours <= 0
+                    && !UploadProject.isStructuralWeekendZero(session.getUploadProject(), hours, date)) {
 
-            if (!hoursStr.isBlank()) {
-
-                try {
-                    hours = Double.parseDouble(hoursStr.trim());
-
-                    if (isRuleEnabled(enabledRules, "TS-04")
-                            && hours <= 0) {
-
-                        issues.add(issue(
-                                sessionId,
-                                "TS-04",
-                                "CRITICAL",
-                                ri,
-                                7,
-                                "Hours",
-                                "Hours must be positive, got: " + hoursStr +
-                                        " for resource '" + name + "'"
-                        ));
-                    }
-
-                } catch (NumberFormatException e) {
-
-                    if (isRuleEnabled(enabledRules, "TS-04")) {
-
-                        issues.add(issue(
-                                sessionId,
-                                "TS-04",
-                                "CRITICAL",
-                                ri,
-                                7,
-                                "Hours",
-                                "Invalid hours value: '" + hoursStr + "'"
-                        ));
-                    }
-                }
+                issues.add(issue(
+                        sessionId,
+                        "TS-04",
+                        "CRITICAL",
+                        ri,
+                        7,
+                        "Hours",
+                        "Hours must be positive, got: " + hoursStr +
+                                " for resource '" + name + "'"
+                ));
             }
 
             // TS-05: Known resource
@@ -951,9 +955,9 @@ public class ValidationService {
         if (isRuleEnabled(enabledRules, "TS-01")) {
             dailyHours.forEach((name, dateMap) ->
                     dateMap.forEach((date, total) -> {
-                                if (total != maxHours) {
+                                if (total > maxHours || (total != 4.0 && total != 8.0)) {
                                     issues.add(issue(sessionId, "TS-01", "CRITICAL", -1, 7, "Hours",
-                                            String.format("Resource '%s' logged %.1f hrs on %s (max %.0f hrs/day)", name, total, date, maxHours)));
+                                            String.format("Resource '%s' logged %.1f hrs on %s (max %.0f hrs/day, must be 4 or 8)", name, total, date, maxHours)));
                                 }
                             })
             );
