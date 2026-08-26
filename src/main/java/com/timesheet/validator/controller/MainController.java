@@ -1,7 +1,6 @@
 package com.timesheet.validator.controller;
 
 import com.timesheet.validator.domain.UploadSession;
-import com.timesheet.validator.domain.ValidationRule;
 import com.timesheet.validator.config.RuleCatalog;
 import com.timesheet.validator.dto.SheetDto;
 import com.timesheet.validator.dto.ValidationResultDto;
@@ -120,28 +119,48 @@ public class MainController {
 
         model.addAttribute("uploadSession",       session);
 
-        List<String> enabledRuleDescriptions = new ArrayList<>();
+        // ── Active validation phase → context-sensitive rules (CR 4.5) ────────
+        String phase0 = session.getValidationPhase() == null ? "TIMESHEET"
+                : session.getValidationPhase();
+        String activePhaseSheet;
+        switch (phase0.toUpperCase()) {
+            case "PIVOT":         activePhaseSheet = "Pivot";        break;
+            case "PROJECT_WISE":  activePhaseSheet = "Projectwise"; break;
+            case "SUMMARY":       activePhaseSheet = "Summary";     break;
+            case "COMMERCIAL":    activePhaseSheet = "Commercial";  break;
+            default:              activePhaseSheet = "Timesheet";
+        }
+        model.addAttribute("activePhaseSheet", activePhaseSheet);
+
         List<String> enabledRuleIds = new ArrayList<>();
 
         if (session.getEnabledRules() != null) {
-
             for (String ruleId : session.getEnabledRules().split(",")) {
+                if (!ruleId.isBlank()) enabledRuleIds.add(ruleId.trim());
+            }
+        }
 
-                enabledRuleIds.add(ruleId);
-
-                ValidationRule rule = ValidationRule.fromRuleId(ruleId);
-
-                if (rule != null) {
-                    enabledRuleDescriptions.add(
-                            rule.getRuleId() + " - " + rule.getDescription()
-                    );
+        // Applied Validations (CR 4.5): show only the ACTIVE phase's rules.
+        // Always-on rules of the active sheet + any toggled rule the user has
+        // selected for that sheet. No more Timesheet rules on later phases.
+        List<String> activeRuleDescriptions = new ArrayList<>();
+        for (RuleCatalog.RuleGroup g : ruleCatalog.getGroups()) {
+            if (!activePhaseSheet.equalsIgnoreCase(g.getSheetName())) continue;
+            for (RuleCatalog.RuleDef r : g.getRules()) {
+                boolean applied = g.isAlwaysOn() || enabledRuleIds.contains(r.getId());
+                if (applied) {
+                    activeRuleDescriptions.add(r.getId() + " - " + r.getDescription());
                 }
             }
         }
 
-        model.addAttribute("enabledRules", enabledRuleDescriptions);
+        model.addAttribute("enabledRules", activeRuleDescriptions);
         model.addAttribute("enabledRuleIds", enabledRuleIds);
-        model.addAttribute("ruleGroups", ruleCatalog.getGroups());
+
+        // Edit-Rules modal (CR 4.5): only the active phase's rule group is shown.
+        model.addAttribute("ruleGroups", ruleCatalog.getGroups().stream()
+                .filter(g -> activePhaseSheet.equalsIgnoreCase(g.getSheetName()))
+                .toList());
 
         // Lazy loading: ship only lightweight per-sheet metadata (name, index,
         // row/col counts). The grids themselves are fetched per tab via
@@ -294,10 +313,10 @@ public class MainController {
 
             ValidationResultDto result = validator.validate(sessionId);
 
-            ra.addFlashAttribute(
-                    "success",
-                    "Timesheet passed. Pivot validation unlocked — found "
-                            + result.getErrorCount() + " pivot error(s).");
+            if (result.getErrorCount() > 0) {   // CR 4.3: banner only when an error is found
+                ra.addFlashAttribute("error",
+                        "Pivot validation found " + result.getErrorCount() + " error(s).");
+            }
 
             int pivotTab = sheetView.getSheetMetas(sessionId)
                     .stream()
@@ -334,10 +353,10 @@ public class MainController {
 
             ValidationResultDto result = validator.validate(sessionId);
 
-            ra.addFlashAttribute(
-                    "success",
-                    "Pivot passed. Projectwise validation unlocked — found "
-                            + result.getErrorCount() + " Projectwise error(s).");
+            if (result.getErrorCount() > 0) {   // CR 4.3
+                ra.addFlashAttribute("error",
+                        "Projectwise validation found " + result.getErrorCount() + " error(s).");
+            }
 
             int projectWiseTab = sheetView.getSheetMetas(sessionId)
                     .stream()
@@ -374,10 +393,10 @@ public class MainController {
 
             ValidationResultDto summaryResult = validator.validate(sessionId);
 
-            ra.addFlashAttribute(
-                    "success",
-                    "Projectwise passed. Summary validation unlocked — found "
-                            + summaryResult.getErrorCount() + " Summary error(s).");
+            if (summaryResult.getErrorCount() > 0) {   // CR 4.3
+                ra.addFlashAttribute("error",
+                        "Summary validation found " + summaryResult.getErrorCount() + " error(s).");
+            }
 
             int summaryTab = sheetView.getSheetMetas(sessionId)
                     .stream()
@@ -414,10 +433,10 @@ public class MainController {
 
             ValidationResultDto commercialResult = validator.validate(sessionId);
 
-            ra.addFlashAttribute(
-                    "success",
-                    "Summary passed. Commercial validation unlocked — found "
-                            + commercialResult.getErrorCount() + " Commercial error(s).");
+            if (commercialResult.getErrorCount() > 0) {   // CR 4.3
+                ra.addFlashAttribute("error",
+                        "Commercial validation found " + commercialResult.getErrorCount() + " error(s).");
+            }
 
             int commercialTab = sheetView.getSheetMetas(sessionId)
                     .stream()
@@ -434,25 +453,42 @@ public class MainController {
         return "redirect:/view/" + sessionId;
     }
 
-    // ── Phased validation: go back to the Timesheet phase ─────────────────────
+    // ── Phased validation: go back one stage and land on that stage's sheet ──
     @PostMapping("/view/{sessionId}/reset-phase")
     public String resetPhase(@PathVariable String sessionId, RedirectAttributes ra) {
         UploadSession session = sessionRepo.findBySessionId(sessionId)
                 .orElseThrow(() -> new RuntimeException("Session not found"));
         String currentPhase = session.getValidationPhase();
+        String targetPhase;
         if ("SUMMARY".equalsIgnoreCase(currentPhase)) {
-            session.setValidationPhase("PROJECT_WISE");
+            targetPhase = "PROJECT_WISE";
         } else if ("COMMERCIAL".equalsIgnoreCase(currentPhase)) {
-            session.setValidationPhase("SUMMARY");
+            targetPhase = "SUMMARY";
         } else if ("PROJECT_WISE".equalsIgnoreCase(currentPhase)) {
-            session.setValidationPhase("PIVOT");
+            targetPhase = "PIVOT";
         } else {
-            session.setValidationPhase("TIMESHEET");
+            targetPhase = "TIMESHEET";
         }
+        session.setValidationPhase(targetPhase);
         sessionRepo.save(session);
         validator.validate(sessionId);
+
+        // Land on the previous stage's sheet instead of defaulting to Timesheet.
+        String targetSheet = switch (targetPhase) {
+            case "PIVOT" -> "Pivot";
+            case "PROJECT_WISE" -> "Projectwise";
+            case "SUMMARY" -> "Summary";
+            case "COMMERCIAL" -> "Commercial";
+            default -> "Timesheet";
+        };
+        int backTab = sheetView.getSheetMetas(sessionId).stream()
+                .filter(m -> targetSheet.equalsIgnoreCase(m.getSheetName()))
+                .map(m -> m.getSheetIndex())
+                .filter(java.util.Objects::nonNull)
+                .findFirst().orElse(0);
+
         ra.addFlashAttribute("success", "Phase reset.");
-        return "redirect:/view/" + sessionId;
+        return "redirect:/view/" + sessionId + "?tab=" + backTab;
     }
 
     // ── Re-validate ───────────────────────────────────────────────────────────
@@ -489,13 +525,47 @@ public class MainController {
                 .orElseThrow(() ->
                         new RuntimeException("Session not found"));
 
-        if (rules == null || rules.isEmpty()) {
+        // Determine the active phase so we only touch that sheet's rules and
+        // never wipe toggled rules from other phases (CR 4.5).
+        String uPhase = session.getValidationPhase() == null ? "TIMESHEET"
+                : session.getValidationPhase();
+        String uSheet;
+        switch (uPhase.toUpperCase()) {
+            case "PIVOT":        uSheet = "Pivot";        break;
+            case "PROJECT_WISE": uSheet = "Projectwise"; break;
+            case "SUMMARY":      uSheet = "Summary";     break;
+            case "COMMERCIAL":   uSheet = "Commercial";  break;
+            default:             uSheet = "Timesheet";
+        }
+
+        // map rule id -> sheet
+        java.util.Map<String, String> idToSheet = new java.util.HashMap<>();
+        for (RuleCatalog.RuleGroup g : ruleCatalog.getGroups()) {
+            for (RuleCatalog.RuleDef r : g.getRules()) {
+                idToSheet.put(r.getId(), g.getSheetName());
+            }
+        }
+
+        // Keep toggled rules from *other* sheets untouched.
+        java.util.Set<String> kept = new java.util.LinkedHashSet<>();
+        if (session.getEnabledRules() != null) {
+            for (String id : session.getEnabledRules().split(",")) {
+                String s = idToSheet.get(id.trim());
+                if (id.isBlank()) continue;
+                if (s == null || !uSheet.equalsIgnoreCase(s)) kept.add(id.trim());
+            }
+        }
+        if (rules != null) {
+            for (String id : rules) if (!id.isBlank()) kept.add(id.trim());
+        }
+
+        if (kept.isEmpty()) {
             ra.addFlashAttribute("error",
                     "Please select at least one validation rule.");
             return "redirect:/view/" + sessionId;
         }
 
-        session.setEnabledRules(String.join(",", rules));
+        session.setEnabledRules(String.join(",", kept));
 
         sessionRepo.save(session);
 
