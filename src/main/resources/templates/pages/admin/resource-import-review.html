@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="en">
+
+<head th:replace="fragments/layout :: head('Admin — Resource Master Review')"></head>
+
+<body>
+
+<nav th:replace="fragments/layout :: navbar"></nav>
+
+<main class="main-content">
+
+    <!-- ============================================================
+         PAGE HEADER
+         ============================================================ -->
+
+    <div class="page-header">
+
+        <div>
+
+            <h1>
+                <i class="fa fa-triangle-exclamation"></i>
+                Resource Master Data Review
+            </h1>
+
+            <p class="subtitle">
+                Review Employee ID mapping changes before proceeding.
+            </p>
+
+        </div>
+
+        <a th:href="@{/admin/resources}"
+           class="btn btn-secondary">
+
+            <i class="fa fa-arrow-left"></i>
+            Back
+
+        </a>
+
+    </div>
+
+
+    <!-- ============================================================
+         WARNING
+         ============================================================ -->
+
+    <div class="alert alert-warning">
+
+        <i class="fa fa-triangle-exclamation"></i>
+
+        <strong>
+            Employee ID Mapping discrepancies have been detected
+            in the uploaded Resource Masterdata.
+        </strong>
+
+        <p style="margin:8px 0 0 0;">
+
+            Please review the changes below before proceeding
+            with the upload.
+
+        </p>
+
+    </div>
+
+
+    <!-- ============================================================
+         MISMATCH TABLE
+         ============================================================ -->
+
+    <div class="card">
+
+        <div class="card-body p-0">
+
+            <div style="overflow-x:auto;">
+
+                <table class="data-table">
+
+                    <thead>
+
+                    <tr>
+
+                        <th>Employee ID</th>
+
+                        <th>Field Name</th>
+
+                        <th>Existing Value</th>
+
+                        <th>Uploaded Value</th>
+
+                    </tr>
+
+                    </thead>
+
+
+                    <tbody>
+
+<!--                    <tr th:each="mismatch : ${session.PENDING_RESOURCE_IMPORT.mismatches}">-->
+
+                    <tr th:each="mismatch : ${pendingImport.mismatches}">
+                        <td>
+
+                            <strong
+                                    th:text="${mismatch.employeeId}">
+                            </strong>
+
+                        </td>
+
+
+                        <td>
+
+                            <strong
+                                    th:text="${mismatch.fieldName}">
+                            </strong>
+
+                        </td>
+
+
+                        <td>
+
+                            <span
+                                    th:text="${mismatch.existingValue != null
+                                            ? mismatch.existingValue
+                                            : '—'}">
+                            </span>
+
+                        </td>
+
+
+                        <td>
+
+                            <span
+                                    th:text="${mismatch.uploadedValue != null
+                                            ? mismatch.uploadedValue
+                                            : '—'}">
+                            </span>
+
+                        </td>
+
+                    </tr>
+
+
+<!--                    <tr th:if="${#lists.isEmpty(session.PENDING_RESOURCE_IMPORT.mismatches)}">-->
+
+                    <tr th:if="${#lists.isEmpty(pendingImport.mismatches)}">
+
+                        <td colspan="4"
+                            style="text-align:center; padding:30px;">
+
+                            No mapping discrepancies found.
+
+                        </td>
+
+                    </tr>
+
+                    </tbody>
+
+                </table>
+
+            </div>
+
+        </div>
+
+    </div>
+
+
+    <!-- ============================================================
+         CONFIRMATION MESSAGE
+         ============================================================ -->
+
+    <div class="alert alert-warning"
+         style="margin-top:20px;">
+
+        <strong>
+            ⚠️ Do you want to continue with the upload?
+        </strong>
+
+        <p style="margin:8px 0 0 0;">
+
+            If you proceed, the uploaded Resource Master data will
+            replace the corresponding existing mappings and become
+            the current Master Data source of truth.
+
+        </p>
+
+    </div>
+
+
+    <!-- ============================================================
+         ACTIONS
+         ============================================================ -->
+
+    <div class="form-actions"
+         style="display:flex; gap:12px; justify-content:flex-end;">
+
+        <!-- PROCEED -->
+
+        <form th:action="@{/admin/master-data/resource-review/proceed}"
+              method="post">
+
+            <button type="submit"
+                    class="btn btn-success">
+
+                <i class="fa fa-check"></i>
+                Proceed
+
+            </button>
+
+        </form>
+
+
+        <!-- CANCEL -->
+
+        <form th:action="@{/admin/master-data/resource-review/cancel}"
+              method="post">
+
+            <button type="submit"
+                    class="btn btn-secondary">
+
+                <i class="fa fa-times"></i>
+                Cancel
+
+            </button>
+
+        </form>
+
+    </div>
+
+</main>
+
+
+<footer th:replace="fragments/layout :: footer"></footer>
+
+<script th:src="@{/js/app.js}"></script>
+
+</body>
+
+</html>

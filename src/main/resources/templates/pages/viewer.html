@@ -16,6 +16,15 @@
             <p class="subtitle">
                 <span th:text="${uploadSession.sheetCount}">0</span> sheets
                 &bull; Uploaded: <span th:text="${#temporals.format(uploadSession.uploadedAt,'dd-MMM-yyyy HH:mm')}"></span>
+                <span th:if="${uploadSession.uploadProject != null}"
+                      class="badge badge-blue"
+                      style="margin-left:8px;vertical-align:middle;">
+                    <i class="fa fa-diagram-project"></i>
+                    Project: <span
+                        th:text="${uploadSession.uploadProject == 'GENERALIZED_TIMESHEET'} ? 'Generalized Timesheet' : 'Sydney SoftDev'">Sydney SoftDev</span>
+                    <span th:if="${uploadSession.uploadProject == 'GENERALIZED_TIMESHEET'}">
+                        (transformed to Sydney SoftDev format)</span>
+                </span>
             </p>
         </div>
         <div class="page-actions">

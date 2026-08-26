@@ -1,0 +1,301 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="en">
+
+<head th:replace="fragments/layout :: head('SOW Master — Review Changes')"></head>
+
+<body>
+
+<nav th:replace="fragments/layout :: navbar"></nav>
+
+<main class="main-content">
+
+    <!-- ============================================================
+         PAGE HEADER
+         ============================================================ -->
+
+    <div class="page-header">
+
+        <div>
+
+            <h1>
+                <i class="fa fa-triangle-exclamation"></i>
+                Review SOW Master Changes
+            </h1>
+
+            <p class="subtitle">
+                Changes were detected in the uploaded SOW Master data.
+            </p>
+
+        </div>
+
+        <a th:href="@{/admin/resources}"
+           class="btn btn-secondary">
+
+            <i class="fa fa-arrow-left"></i>
+            Back
+
+        </a>
+
+    </div>
+
+
+    <!-- ============================================================
+         WARNING
+         ============================================================ -->
+
+    <div class="alert alert-warning">
+
+        <i class="fa fa-triangle-exclamation"></i>
+
+        <strong>
+            Changes have been detected in the uploaded SOW Master data.
+        </strong>
+
+        <p style="margin:8px 0 0 28px;">
+
+            Please review the modified values before proceeding.
+            Do you want to overwrite the existing Master Data?
+
+        </p>
+
+    </div>
+
+
+    <!-- ============================================================
+         MISMATCH SUMMARY
+         ============================================================ -->
+
+    <div class="card">
+
+        <div class="card-body">
+
+            <div style="margin-bottom:16px;">
+
+                <strong>
+                    <span th:text="${#lists.size(
+                        pendingImport.validationResult.mismatches
+                    )}">
+                        0
+                    </span>
+
+                    mapping change(s) detected.
+                </strong>
+
+            </div>
+
+
+            <!-- ====================================================
+                 MISMATCH TABLE
+                 ==================================================== -->
+
+            <div style="overflow-x:auto;">
+
+                <table class="data-table">
+
+                    <thead>
+
+                    <tr>
+
+                        <th>SOW Number</th>
+
+                        <th>Field Name</th>
+
+                        <th>Existing Value</th>
+
+                        <th>Uploaded Value</th>
+
+                    </tr>
+
+                    </thead>
+
+
+                    <tbody>
+
+                    <tr th:each="mismatch :
+                        ${pendingImport.validationResult.mismatches}">
+
+                        <!-- SOW NUMBER -->
+
+                        <td>
+
+                            <span class="badge badge-blue"
+                                  th:text="${mismatch.sowNumber}">
+
+                            </span>
+
+                        </td>
+
+
+                        <!-- FIELD NAME -->
+
+                        <td>
+
+                            <strong
+                                    th:text="${mismatch.fieldName}">
+                            </strong>
+
+                        </td>
+
+
+                        <!-- EXISTING VALUE -->
+
+                        <td>
+
+                            <span
+                                    th:text="${mismatch.existingValue != null
+                                    ? mismatch.existingValue
+                                    : '—'}">
+
+                            </span>
+
+                        </td>
+
+
+                        <!-- UPLOADED VALUE -->
+
+                        <td>
+
+                            <span
+                                    th:text="${mismatch.uploadedValue != null
+                                    ? mismatch.uploadedValue
+                                    : '—'}">
+
+                            </span>
+
+                        </td>
+
+                    </tr>
+
+
+                    <!-- =================================================
+                         EMPTY STATE
+                         ================================================= -->
+
+                    <tr th:if="${#lists.isEmpty(
+                        pendingImport.validationResult.mismatches
+                    )}">
+
+                        <td colspan="4"
+                            style="text-align:center; padding:30px;">
+
+                            No changes detected.
+
+                        </td>
+
+                    </tr>
+
+                    </tbody>
+
+                </table>
+
+            </div>
+
+        </div>
+
+    </div>
+
+
+    <!-- ============================================================
+         CONFIRMATION MESSAGE
+         ============================================================ -->
+
+    <div class="card"
+         style="margin-top:20px;">
+
+        <div class="card-body">
+
+            <div style="display:flex;
+                        align-items:flex-start;
+                        gap:12px;">
+
+                <i class="fa fa-circle-info"
+                   style="margin-top:4px;">
+                </i>
+
+                <div>
+
+                    <strong>
+                        Confirm SOW Master update
+                    </strong>
+
+                    <p style="margin:6px 0 0 0;">
+
+                        Clicking
+                        <strong>Proceed</strong>
+                        will replace the existing values with
+                        the uploaded values.
+
+                        Clicking
+                        <strong>Cancel</strong>
+                        will discard the uploaded changes and
+                        keep the existing Master Data unchanged.
+
+                    </p>
+
+                </div>
+
+            </div>
+
+        </div>
+
+    </div>
+
+
+    <!-- ============================================================
+         ACTIONS
+         ============================================================ -->
+
+    <div class="form-actions"
+         style="margin-top:20px;">
+
+        <!-- ========================================================
+             PROCEED
+             ======================================================== -->
+
+        <form th:action="@{/admin/master-data/sow-review/proceed}"
+              method="post"
+              style="display:inline;">
+
+            <button type="submit"
+                    class="btn btn-success">
+
+                <i class="fa fa-check"></i>
+
+                Proceed
+
+            </button>
+
+        </form>
+
+
+        <!-- ========================================================
+             CANCEL
+             ======================================================== -->
+
+        <form th:action="@{/admin/master-data/sow-review/cancel}"
+              method="post"
+              style="display:inline;">
+
+            <button type="submit"
+                    class="btn btn-secondary">
+
+                <i class="fa fa-xmark"></i>
+
+                Cancel
+
+            </button>
+
+        </form>
+
+    </div>
+
+</main>
+
+
+<footer th:replace="fragments/layout :: footer"></footer>
+
+<script th:src="@{/js/app.js}"></script>
+
+</body>
+
+</html>

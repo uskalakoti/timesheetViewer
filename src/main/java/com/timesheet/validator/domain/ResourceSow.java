@@ -2,6 +2,7 @@ package com.timesheet.validator.domain;
 
 import lombok.*;
 import javax.persistence.*;
+import java.math.BigDecimal;
 
 @Entity
 @Table(name = "RESOURCE_SOW")
@@ -17,4 +18,16 @@ public class ResourceSow {
 
     @Column(name = "ROLE_IN_SOW")
     private String roleInSow;
+
+    @Column(name = "ASSIGNED_TEAM")
+    private String assignedTeam;
+
+    @Column(name = "PROJECT_CODE")
+    private String projectCode;
+
+    @Column(name = "SUB_PROJECT")
+    private String subProject;
+
+    @Column(name = "TRAVEL_EXPENSE")
+    private BigDecimal travelExpense;
 }
