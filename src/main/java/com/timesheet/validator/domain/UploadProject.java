@@ -86,4 +86,48 @@ public enum UploadProject {
         DayOfWeek dow = date.getDayOfWeek();
         return dow == DayOfWeek.SATURDAY || dow == DayOfWeek.SUNDAY;
     }
+
+    /**
+     * Defect 7.2 — Returns {@code true} when the upload format is
+     * {@link #GENERALIZED_TIMESHEET} and the entry has zero hours on a date
+     * that is a known public holiday. Such entries are an accepted artifact
+     * of the Timatic calendar-based export and should not trigger TS-03
+     * (public holiday) or TS-04 (hours must be positive) violations.
+     *
+     * @param rawProject the persisted upload project string
+     * @param hours      the row's parsed hours value
+     * @param date       the row's parsed date
+     * @param holidays   set of known public holiday dates (pass empty set if unknown)
+     * @return {@code true} if the checks should be suppressed for this row
+     */
+    public static boolean isStructuralHolidayZero(String rawProject, double hours, LocalDate date,
+                                                   java.util.Set<java.time.LocalDate> holidays) {
+        if (fromParam(rawProject) != GENERALIZED_TIMESHEET || date == null || hours != 0.0) {
+            return false;
+        }
+        return holidays.contains(date);
+    }
+
+    /**
+     * Defect 7.2 — Returns {@code true} when the upload format is
+     * {@link #GENERALIZED_TIMESHEET} and the entry has zero hours with a
+     * task/description indicating planned leave (e.g. "PL", "Planned Leave").
+     * Such entries are an accepted artifact of the Timatic export and should
+     * not trigger TS-04 (hours must be positive) violations.
+     *
+     * @param rawProject the persisted upload project string
+     * @param hours      the row's parsed hours value
+     * @param task       the row's task/description value from the Timesheet
+     * @return {@code true} if the checks should be suppressed for this row
+     */
+    public static boolean isStructuralPlannedLeaveZero(String rawProject, double hours, String task) {
+        if (fromParam(rawProject) != GENERALIZED_TIMESHEET || hours != 0.0) {
+            return false;
+        }
+        if (task == null || task.isBlank()) {
+            return false;
+        }
+        String upper = task.trim().toUpperCase();
+        return upper.equals("PL") || upper.contains("PLANNED LEAVE") || upper.contains("PL ");
+    }
 }

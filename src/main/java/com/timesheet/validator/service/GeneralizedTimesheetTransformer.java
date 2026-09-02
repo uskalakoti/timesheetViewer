@@ -9,6 +9,7 @@ import org.apache.poi.ss.usermodel.FormulaEvaluator;
 import org.apache.poi.ss.usermodel.Row;
 import org.apache.poi.ss.usermodel.Sheet;
 import org.apache.poi.ss.usermodel.Workbook;
+import org.apache.poi.ss.util.CellReference;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.springframework.stereotype.Service;
 
@@ -19,6 +20,8 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeSet;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /**
  * CR 5.3 — Generalized Timesheet Format Transformation Engine.
@@ -76,6 +79,23 @@ public class GeneralizedTimesheetTransformer {
     private static final int P_COL_DATE = 0, P_COL_NAME = 1, P_COL_PROJECT = 2,
             P_COL_HOURS = 3, P_COL_TASK = 4, P_COL_COMPANY = 5, P_COL_SOW = 6;
 
+    /** Default working hours per day (the generalized per-person sheets divide
+     *  their totals by 8; the pivot Days column mirrors that convention). */
+    private static final int DEFAULT_DAILY_HOURS = 8;
+
+    /** 0-based column index at which the Travel Expense column is inserted in the
+     *  normalized Summary (and the reason Summary column refs ≥ J must shift +1). */
+    private static final int SUMMARY_SHIFT_FROM = 9;
+
+    /** Column-reference matcher (cell or range), with optional sheet qualifier. */
+    private static final Pattern CELL_REF = Pattern.compile(
+            "(?:(?:('[^']*'|\\w+)!)?)(\\$?)([A-Za-z]{1,3})(\\$?\\d+)"
+                    + "(?::(\\$?)([A-Za-z]{1,3})(\\$?\\d+))?");
+
+    /** Matches a direct cross-sheet cell reference: 'Sheet'!D32 / Sheet!D32. */
+    private static final Pattern SHEET_CELL_REF = Pattern.compile(
+            "^('(?:[^']|'')*'|\\w+)!\\$?([A-Za-z]{1,3})\\$?(\\d+)$");
+
     /**
      * Detects a generalized per-person sheet by its header signature:
      * Date | Name | Project | Hours | Description... | Company | SOW...
@@ -97,6 +117,10 @@ public class GeneralizedTimesheetTransformer {
 
         List<String[]> entries = new ArrayList<>(); // date ISO | name | project | hours | task | company | sow
         TreeSet<LocalDateTime> dates = new TreeSet<>();
+        // Per-person sheet name -> the employee name recorded on that sheet.
+        // Used to translate Summary day-worked references (which point at the
+        // per-person sheets) after those sheets are flattened into the pivot.
+        Map<String, String> sheetToEmployee = new LinkedHashMap<>();
         int consolidated = 0;
 
         org.apache.poi.ss.usermodel.FormulaEvaluator evaluator =
@@ -105,7 +129,7 @@ public class GeneralizedTimesheetTransformer {
         for (int si = 0; si < source.getNumberOfSheets(); si++) {
             Sheet sheet = source.getSheetAt(si);
             if (!META_SHEETS.contains(sheet.getSheetName()) && isPersonSheet(sheet)) {
-                consolidated += collectEntries(sheet, sheet.getSheetName(), entries, dates, evaluator);
+                consolidated += collectEntries(sheet, sheet.getSheetName(), entries, dates, evaluator, sheetToEmployee);
             }
         }
         log.info("[Transformer] Consolidated {} entries from person sheets", consolidated);
@@ -117,9 +141,13 @@ public class GeneralizedTimesheetTransformer {
 
         try (Workbook out = new XSSFWorkbook()) {
             buildTimesheet(out.createSheet("Timesheet"), entries);
-            buildPivot(out.createSheet("Pivot"), entries, dates);
+            Map<String, Integer> employeeToPivotRow =
+                    buildPivot(out.createSheet("Pivot"), entries, dates);
             buildProjectWise(out.createSheet("Projectwise"), entries);
-            normalizeSummary(source, out);
+            // Pivot layout: Name(0) then N date columns; Grand Total at index N+1,
+            // Days at index N+2 (the column the Summary Days-Worked links into).
+            int pivotDaysCol = 2 + dates.size();
+            normalizeSummary(source, out, employeeToPivotRow, sheetToEmployee, pivotDaysCol);
             normalizeCommercial(source, out);
             copyAdminSheet(source, out);
 
@@ -136,7 +164,8 @@ public class GeneralizedTimesheetTransformer {
     /** Collects data rows from one person sheet into flat standard entries. */
     private int collectEntries(Sheet sheet, String fallbackName,
                                List<String[]> entries, TreeSet<LocalDateTime> dates,
-                               org.apache.poi.ss.usermodel.FormulaEvaluator evaluator) {
+                               org.apache.poi.ss.usermodel.FormulaEvaluator evaluator,
+                               Map<String, String> sheetToEmployee) {
         int count = 0;
         for (int r = 1; r <= sheet.getLastRowNum(); r++) {
             Row row = sheet.getRow(r);
@@ -144,6 +173,9 @@ public class GeneralizedTimesheetTransformer {
             LocalDateTime date = parseDate(row.getCell(P_COL_DATE), evaluator);
             if (date == null) continue;                       // not a data row
             String name = firstNonBlank(text(row.getCell(P_COL_NAME), evaluator), fallbackName);
+            if (!isBlank(name)) {
+                sheetToEmployee.putIfAbsent(fallbackName, name);
+            }
             String hoursText = text(row.getCell(P_COL_HOURS), evaluator);
             String task = text(row.getCell(P_COL_TASK), evaluator);
             if (isBlank(name) && isBlank(hoursText) && isBlank(task)) continue; // blank filler row
@@ -238,12 +270,21 @@ public class GeneralizedTimesheetTransformer {
         autoSize(sheet);
     }
 
-    /** Name × date pivot matrix with Grand Total and Days columns. */
-    private void buildPivot(Sheet sheet, List<String[]> entries, TreeSet<LocalDateTime> dates) {
+    /**
+     * Name × date pivot matrix with Grand Total and Days columns.
+     * <p>Defect 7.3 — the Days column is now a formula {@code =<GrandTotal>/8}
+     * (mirroring the native Sydney SoftDev pivot, whose Days = Grand Total ÷
+     * working hours per day) instead of a count of non-zero date cells, and the
+     * 1-based Excel row of each employee is returned so the Summary sheet can
+     * link its Days Worked cells into the pivot.
+     */
+    private Map<String, Integer> buildPivot(Sheet sheet, List<String[]> entries, TreeSet<LocalDateTime> dates) {
         // title row mirrors the native Sydney SoftDev pivot layout
         Row title = sheet.createRow(2);
         title.createCell(0).setCellValue("Sum of Hours (Mandatory)");
         title.createCell(1).setCellValue("Date (Mandatory)");
+
+        Map<String, Integer> employeeToPivotRow = new LinkedHashMap<>();
 
         List<LocalDateTime> sortedDates = new ArrayList<>(dates);
         Map<String, Map<LocalDateTime, Double>> byEmployee = new LinkedHashMap<>();
@@ -269,24 +310,28 @@ public class GeneralizedTimesheetTransformer {
             Row row = sheet.createRow(r++);
             row.createCell(0).setCellValue(emp.getKey());
             double total = 0;
-            int days = 0;
             int c = 1;
             for (LocalDateTime d : sortedDates) {
                 Double h = emp.getValue().get(d);
                 if (h != null && h != 0) {
                     row.createCell(c).setCellValue(h);
                     total += h;
-                    days++;
                 }
                 c++;
             }
             row.createCell(grandTotalCol).setCellValue(total);
-            row.createCell(grandTotalCol + 1).setCellValue(days);
+            int excelRow = r; // 0-based r just incremented; 1-based excel row = r
+            // Days = Grand Total hours / default daily hours (mirrors the source
+            // per-person sheets, which divide their totals by 8).
+            row.createCell(grandTotalCol + 1)
+                    .setCellFormula(CellReference.convertNumToColString(grandTotalCol) + excelRow
+                            + "/" + DEFAULT_DAILY_HOURS);
+            employeeToPivotRow.put(emp.getKey(), excelRow);
         }
 
         Row grandTotalRow = sheet.createRow(r);
         grandTotalRow.createCell(0).setCellValue("Grand Total");
-        for (int c = 1; c <= grandTotalCol + 1; c++) {
+        for (int c = 1; c <= grandTotalCol; c++) {
             double sum = 0;
             boolean any = false;
             for (int rr = 4; rr < r; rr++) {
@@ -298,7 +343,13 @@ public class GeneralizedTimesheetTransformer {
             }
             if (any) grandTotalRow.createCell(c).setCellValue(sum);
         }
+        // Grand Total row Days — same hours/8 denominator as the employee rows.
+        Cell grandTotalDays = grandTotalRow.getCell(grandTotalCol + 1);
+        if (grandTotalDays == null) grandTotalDays = grandTotalRow.createCell(grandTotalCol + 1);
+        grandTotalDays.setCellFormula(CellReference.convertNumToColString(grandTotalCol) + (r + 1)
+                + "/" + DEFAULT_DAILY_HOURS);
         autoSize(sheet);
+        return employeeToPivotRow;
     }
 
     /** Project totals + project hierarchy tables, mirroring the native layout. */
@@ -353,7 +404,10 @@ public class GeneralizedTimesheetTransformer {
      * Copies Summary inserting a blank "Travel Expense" column at index 9 so
      * Total Amount lands at index 10 like the Sydney SoftDev layout.
      */
-    private void normalizeSummary(Workbook src, Workbook out) {
+    private void normalizeSummary(Workbook src, Workbook out,
+                                   Map<String, Integer> employeeToPivotRow,
+                                   Map<String, String> sheetToEmployee,
+                                   int pivotDaysCol) {
         Sheet summary = src.getSheet("Summary");
         if (summary == null) return;
         Sheet target = out.createSheet("Summary");
@@ -376,7 +430,100 @@ public class GeneralizedTimesheetTransformer {
                 inserted.setCellValue("Travel Expense\n(USD)");
             }
         }
+
+        // Defect 7.3:
+        //  1) Formulas copied from the source that reference Summary columns ≥ J
+        //     (0-based index 9) are bumped right by one to follow the inserted
+        //     Travel Expense column — e.g. the totals row =SUM(J3:J8) -> =SUM(K3:K8).
+        //  2) Days Worked cells that reference a per-person sheet (e.g.
+        //     ='Deepa Malik'!D32) are rewritten to link into the reconstructed
+        //     Pivot sheet (=Pivot!M5) exactly like the native Sydney layout.
+        //     The link follows the source workbook's OWN sheet reference, so no
+        //     name matching is involved and distinct people with similar names
+        //     can never be conflated.
+        String daysColLetter = CellReference.convertNumToColString(pivotDaysCol);
+        for (int r = 0; r <= target.getLastRowNum(); r++) {
+            Row outRow = target.getRow(r);
+            if (outRow == null) continue;
+            for (int c = 0; c < outRow.getLastCellNum(); c++) {
+                Cell cell = outRow.getCell(c);
+                if (cell == null || cell.getCellType() != CellType.FORMULA) continue;
+                String formula = cell.getCellFormula();
+                if (formula == null) continue;
+                if (c == 8) {
+                    String linked = linkDaysWorked(formula, sheetToEmployee,
+                            employeeToPivotRow, daysColLetter);
+                    if (linked != null) {
+                        cell.setCellFormula(linked);
+                        continue;
+                    }
+                }
+                String shifted = shiftSummaryColumnRefs(formula, true);
+                if (!shifted.equals(formula)) {
+                    cell.setCellFormula(shifted);
+                }
+            }
+        }
         autoSize(target);
+    }
+
+    /**
+     * Converts a source Summary Days-Worked formula ({@code 'Person'!D32} or
+     * {@code Person!D32}) into a Pivot link ({@code =Pivot!M<row>}) using the
+     * recorded per-sheet employee name and the pivot row that name landed on.
+     * Returns {@code null} when the reference cannot be resolved, leaving the
+     * cell untouched.
+     */
+    private String linkDaysWorked(String formula, Map<String, String> sheetToEmployee,
+                                  Map<String, Integer> employeeToPivotRow, String daysColLetter) {
+        if (formula == null) return null;
+        Matcher m = SHEET_CELL_REF.matcher(formula.trim());
+        if (!m.matches()) return null;
+        String sheet = m.group(1).replaceAll("^'|'$", "");
+        String employee = sheetToEmployee.get(sheet);
+        if (employee == null) return null;
+        Integer pivotRow = employeeToPivotRow.get(employee);
+        if (pivotRow == null) return null;
+        return "Pivot!" + daysColLetter + pivotRow;
+    }
+
+    /**
+     * Bumps column references that point at the Summary sheet by one column
+     * (only those at index ≥ {@link #SUMMARY_SHIFT_FROM}) to account for the
+     * inserted Travel Expense column. Unqualified references are bumped only
+     * when the formula itself lives on the Summary sheet.
+     */
+    private String shiftSummaryColumnRefs(String formula, boolean inSummarySheet) {
+        if (formula == null || formula.isEmpty()) return formula;
+        Matcher m = CELL_REF.matcher(formula);
+        if (!m.find()) return formula;
+        m.reset();
+        StringBuilder sb = new StringBuilder();
+        int last = 0;
+        while (m.find()) {
+            String sheet = m.group(1);
+            boolean toSummary = (sheet == null) ? inSummarySheet
+                    : "Summary".equalsIgnoreCase(sheet.replaceAll("^'|'$", ""));
+            // Re-emit the sheet qualifier (e.g. "Summary!" or "'Deepa Malik'!") —
+            // it was part of the match but not captured as a standalone group.
+            String prefix = (sheet == null) ? "" : sheet + "!";
+            String col1 = m.group(3);
+            String repl = prefix + m.group(2) + (toSummary ? bumpColumn(col1) : col1) + m.group(4);
+            if (m.group(6) != null) {
+                repl += ":" + m.group(5) + (toSummary ? bumpColumn(m.group(6)) : m.group(6)) + m.group(7);
+            }
+            sb.append(formula, last, m.start()).append(repl);
+            last = m.end();
+        }
+        sb.append(formula, last, formula.length());
+        return sb.toString();
+    }
+
+    private String bumpColumn(String col) {
+        int idx = CellReference.convertColStringToIndex(col);
+        return (idx >= SUMMARY_SHIFT_FROM)
+                ? CellReference.convertNumToColString(idx + 1)
+                : col;
     }
 
     /**
@@ -404,7 +551,17 @@ public class GeneralizedTimesheetTransformer {
             if (srcRow == null) continue;
             Row outRow = target.createRow(r - offset);
             for (int c = 0; c < srcRow.getLastCellNum(); c++) {
-                copyCell(srcRow.getCell(c), outRow.createCell(c));
+                Cell outCell = outRow.createCell(c);
+                copyCell(srcRow.getCell(c), outCell);
+                // Defect 7.3: shift Summary column refs (≥ J) so e.g.
+                // =SUM(Summary!J3:J8) still targets Total Amount after the
+                // Travel Expense column is inserted (J -> K).
+                if (outCell.getCellType() == CellType.FORMULA && outCell.getCellFormula() != null) {
+                    String shifted = shiftSummaryColumnRefs(outCell.getCellFormula(), false);
+                    if (!shifted.equals(outCell.getCellFormula())) {
+                        outCell.setCellFormula(shifted);
+                    }
+                }
             }
         }
         autoSize(target);

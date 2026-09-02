@@ -731,12 +731,16 @@ public class ValidationService {
 
         if (summaryPhase && !summaryCells.isEmpty()) {
 
+            boolean generalizedSummary = UploadProject.fromParam(session.getUploadProject())
+                    == UploadProject.GENERALIZED_TIMESHEET;
+
             validateSummary(
                     sessionId,
                     allCells,
                     pivotCells,
                     summaryCells,
-                    issues);
+                    issues,
+                    generalizedSummary);
         }
 
         // ======================================================
@@ -883,9 +887,12 @@ public class ValidationService {
             }
 
             // TS-03: Public holiday
+            // Defect 7.2: Generalized Timesheet — 0-hour entries on public holidays are valid
             if (isRuleEnabled(enabledRules, "TS-03")
                     && date != null
-                    && holidays.contains(date)) {
+                    && holidays.contains(date)
+                    && !UploadProject.isStructuralHolidayZero(
+                            session.getUploadProject(), hours, date, holidays)) {
                 String hName = holidayRepo.findAll().stream()
                     .filter(h -> h.getHolidayDate().equals(date))
                     .map(h -> h.getHolidayName()).findFirst().orElse("holiday");
@@ -894,10 +901,15 @@ public class ValidationService {
             }
 
             // TS-04: Hours must be positive (structural weekend-zero entries exempt for generalized)
+            // Defect 7.2: Generalized Timesheet — also exempt 0-hour entries on holidays and planned leave
             if (isRuleEnabled(enabledRules, "TS-04")
                     && !hoursStr.isBlank()
                     && hours <= 0
-                    && !UploadProject.isStructuralWeekendZero(session.getUploadProject(), hours, date)) {
+                    && !UploadProject.isStructuralWeekendZero(session.getUploadProject(), hours, date)
+                    && !UploadProject.isStructuralHolidayZero(
+                            session.getUploadProject(), hours, date, holidays)
+                    && !UploadProject.isStructuralPlannedLeaveZero(
+                            session.getUploadProject(), hours, task)) {
 
                 issues.add(issue(
                         sessionId,
@@ -3280,6 +3292,49 @@ private void validateSubProjects(
     // SUMMARY VALIDATION
     // ======================================================
 
+    /** True for structural 'not-applicable' tokens (NA / N-A / N/A) found in
+     *  generalized Summary rows (e.g. the "Monthly on call Support" row).
+     *  These carry no numeric value and must be exempted from numeric checks. */
+    private boolean isNotApplicableToken(String s) {
+        if (s == null) return false;
+        String t = s.trim();
+        return t.equalsIgnoreCase("NA") || t.equalsIgnoreCase("N/A")
+                || t.equalsIgnoreCase("N-A");
+    }
+
+    /**
+     * When the given Summary Days-Worked cell carries a Pivot link formula
+     * (e.g. {@code =Pivot!M5}, as written by the generalized transformer),
+     * resolves and returns the employee name on that Pivot row (column A).
+     * Returns {@code null} when the cell is not a resolvable Pivot link.
+     */
+    private String resolvePivotLinkedEmployee(CellData daysCell, List<CellData> pivotCells) {
+        if (daysCell == null || pivotCells == null) return null;
+        String formula = daysCell.getFormula();
+        if (formula == null) return null;
+        java.util.regex.Matcher m = java.util.regex.Pattern.compile(
+                "^=([^!]+)!\\$?([A-Za-z]{1,3})\\$?(\\d+)$").matcher(formula.trim());
+        if (!m.matches()) return null;
+        String sheet = m.group(1).replaceAll("^'|'$", "");
+        if (!"Pivot".equalsIgnoreCase(sheet)) return null;
+        int excelRow;
+        try {
+            excelRow = Integer.parseInt(m.group(3));
+        } catch (NumberFormatException e) {
+            return null;
+        }
+        int rowIdx = excelRow - 1;
+        for (CellData c : pivotCells) {
+            if (c.getRowIdx() == rowIdx && c.getColIdx() == 0) {
+                String v = c.getDisplayValue();
+                if (v != null && !v.isBlank() && !"Grand Total".equalsIgnoreCase(v.trim())) {
+                    return v.trim();
+                }
+            }
+        }
+        return null;
+    }
+
     /**
      * Build a ValidationIssue for the Summary sheet.
      */
@@ -3321,7 +3376,8 @@ private void validateSubProjects(
             List<CellData> timesheetCells,
             List<CellData> pivotCells,
             List<CellData> summaryCells,
-            List<ValidationIssue> issues) {
+            List<ValidationIssue> issues,
+            boolean generalized) {
 
         log.info("==================================================");
         log.info("Starting Summary Validation");
@@ -3570,42 +3626,57 @@ private void validateSubProjects(
             // SM-07: Working Days (three-way reconciliation)
             // =========================================
             if (!employeeName.isBlank() && !daysWorkedStr.isBlank()) {
-                String normalizedName = employeeName.trim().toLowerCase();
-                try {
-                    double summaryDays = Double.parseDouble(daysWorkedStr.trim());
+                // Generalized: 'NA'-style placeholders in Days Worked (e.g. the
+                // "Monthly on call Support" row) are structural and carry no
+                // numeric value, so they are exempt from reconciliation.
+                if (generalized && isNotApplicableToken(daysWorkedStr)) {
+                    // skip N/A rows
+                } else {
+                    try {
+                        double summaryDays = Double.parseDouble(daysWorkedStr.trim());
 
-                    Double pivotDayVal = pivotDays.get(normalizedName);
+                        // Follow the Days-Worked pivot link (e.g. =Pivot!M5) so
+                        // Summary rows whose Name differs from the Timesheet/Pivot
+                        // employee (e.g. "Muhammad Shams uz zaman" vs "Muhammad Shams")
+                        // reconcile against the linked employee rather than the typed
+                        // name — deterministically, via the source workbook's own link.
+                        String linkedEmployee = resolvePivotLinkedEmployee(cols.get(8), pivotCells);
+                        String lookupName = (linkedEmployee != null)
+                                ? linkedEmployee
+                                : employeeName.trim().toLowerCase();
 
-                    Double timesheetTotal = timesheetTotals.get(normalizedName);
-                    double workingHoursPerDay = getWorkingHoursPerDay(employeeName);
-                    double expectedDaysFromTimesheet = (timesheetTotal != null)
-                            ? timesheetTotal / workingHoursPerDay
-                            : 0.0;
+                        Double pivotDayVal = pivotDays.get(normalizeName(lookupName));
+                        Double timesheetTotal = timesheetTotals.get(lookupName.trim().toLowerCase());
+                        double workingHoursPerDay = getWorkingHoursPerDay(lookupName);
+                        double expectedDaysFromTimesheet = (timesheetTotal != null)
+                                ? timesheetTotal / workingHoursPerDay
+                                : 0.0;
 
-                    boolean mismatch = false;
-                    StringBuilder msg = new StringBuilder();
-                    msg.append(String.format("Working Days mismatch for '%s'. Summary=%.1f",
-                            employeeName, summaryDays));
+                        boolean mismatch = false;
+                        StringBuilder msg = new StringBuilder();
+                        msg.append(String.format("Working Days mismatch for '%s'. Summary=%.1f",
+                                employeeName, summaryDays));
 
-                    if (pivotDayVal != null && Math.abs(summaryDays - pivotDayVal) > 0.01) {
-                        mismatch = true;
-                        msg.append(String.format(", Pivot=%.1f", pivotDayVal));
-                    }
-                    if (Math.abs(summaryDays - expectedDaysFromTimesheet) > 0.01) {
-                        mismatch = true;
-                        msg.append(String.format(", Timesheet=%.1f", expectedDaysFromTimesheet));
-                    }
+                        if (pivotDayVal != null && Math.abs(summaryDays - pivotDayVal) > 0.01) {
+                            mismatch = true;
+                            msg.append(String.format(", Pivot=%.1f", pivotDayVal));
+                        }
+                        if (Math.abs(summaryDays - expectedDaysFromTimesheet) > 0.01) {
+                            mismatch = true;
+                            msg.append(String.format(", Timesheet=%.1f", expectedDaysFromTimesheet));
+                        }
 
-                    if (mismatch) {
+                        if (mismatch) {
+                            issues.add(summaryIssue(
+                                    sessionId, "SM-07", "CRITICAL", rowIdx, 8, "Days Worked",
+                                    msg.toString()));
+                        }
+                    } catch (NumberFormatException e) {
                         issues.add(summaryIssue(
                                 sessionId, "SM-07", "CRITICAL", rowIdx, 8, "Days Worked",
-                                msg.toString()));
+                                String.format("Invalid Days Worked value '%s' for '%s'.",
+                                        daysWorkedStr, employeeName)));
                     }
-                } catch (NumberFormatException e) {
-                    issues.add(summaryIssue(
-                            sessionId, "SM-07", "CRITICAL", rowIdx, 8, "Days Worked",
-                            String.format("Invalid Days Worked value '%s' for '%s'.",
-                                    daysWorkedStr, employeeName)));
                 }
             }
 
@@ -3632,7 +3703,12 @@ private void validateSubProjects(
             // =========================================
             // SM-09: Total Amount formula validation
             // =========================================
-            if (!dailyRateStr.isBlank() && !daysWorkedStr.isBlank() && !totalAmountStr.isBlank()) {
+            boolean naRow = generalized
+                    && (isNotApplicableToken(dailyRateStr)
+                        || isNotApplicableToken(daysWorkedStr)
+                        || isNotApplicableToken(totalAmountStr));
+            if (!naRow
+                    && !dailyRateStr.isBlank() && !daysWorkedStr.isBlank() && !totalAmountStr.isBlank()) {
                 try {
                     double dailyRate = Double.parseDouble(dailyRateStr.trim());
                     double daysWorked = Double.parseDouble(daysWorkedStr.trim());
