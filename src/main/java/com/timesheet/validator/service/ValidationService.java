@@ -883,9 +883,12 @@ public class ValidationService {
             }
 
             // TS-03: Public holiday
+            // Defect 7.2: Generalized Timesheet — 0-hour entries on public holidays are valid
             if (isRuleEnabled(enabledRules, "TS-03")
                     && date != null
-                    && holidays.contains(date)) {
+                    && holidays.contains(date)
+                    && !UploadProject.isStructuralHolidayZero(
+                            session.getUploadProject(), hours, date, holidays)) {
                 String hName = holidayRepo.findAll().stream()
                     .filter(h -> h.getHolidayDate().equals(date))
                     .map(h -> h.getHolidayName()).findFirst().orElse("holiday");
@@ -894,10 +897,15 @@ public class ValidationService {
             }
 
             // TS-04: Hours must be positive (structural weekend-zero entries exempt for generalized)
+            // Defect 7.2: Generalized Timesheet — also exempt 0-hour entries on holidays and planned leave
             if (isRuleEnabled(enabledRules, "TS-04")
                     && !hoursStr.isBlank()
                     && hours <= 0
-                    && !UploadProject.isStructuralWeekendZero(session.getUploadProject(), hours, date)) {
+                    && !UploadProject.isStructuralWeekendZero(session.getUploadProject(), hours, date)
+                    && !UploadProject.isStructuralHolidayZero(
+                            session.getUploadProject(), hours, date, holidays)
+                    && !UploadProject.isStructuralPlannedLeaveZero(
+                            session.getUploadProject(), hours, task)) {
 
                 issues.add(issue(
                         sessionId,
