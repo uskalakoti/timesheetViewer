@@ -526,6 +526,62 @@ public class GeneralizedTimesheetTransformer {
                 : col;
     }
 
+    /** Cell references inside a Commercial formula, for row-shifting.
+     *  Two alternatives, tried in order:
+     *  <ol>
+     *    <li>sheet-qualified refs/ranges ({@code Summary!K3:K8}, {@code Pivot!M5})
+     *        — matched atomically so the range's second endpoint is never
+     *        exposed as a bare ref; their rows must NOT be shifted (the
+     *        Summary sheet keeps its own rows);</li>
+     *    <li>same-sheet refs/ranges ({@code B7}, {@code D21:D26}) — rows are
+     *        shifted by the stripped preamble offset. The lookbehind excludes
+     *        {@code !} (cross-sheet), {@code :} (range connector handled by
+     *        the whole-range match above), {@code .} (decimal literals) and
+     *        alphanumerics (function names like LOG10).</li>
+     *  </ol> */
+    private static final java.util.regex.Pattern COMMERCIAL_ROW_REF =
+            java.util.regex.Pattern.compile(
+                    "[A-Za-z0-9_]+!\\$?[A-Za-z]{1,3}\\$?\\d+(?::\\$?[A-Za-z]{1,3}\\$?\\d+)?"
+                    + "|(?<![A-Za-z0-9_.!:$])(\\$?[A-Za-z]{1,3})(\\$?)(\\d+)"
+                    + "(?::(\\$?)([A-Za-z]{1,3})(\\$?)(\\d+))?(?![0-9A-Za-z_(])");
+
+    /**
+     * Shifts unqualified (same-sheet) row references in a Commercial formula
+     * up by the stripped preamble offset. The Commercial sheet is copied
+     * without its leading preamble rows, so a source formula like {@code =B7}
+     * (PO Value link for the PO Amount row) or the invoicing balance chain
+     * {@code =D22-C21} / {@code =B19-C26} would otherwise keep pointing at
+     * the pre-strip rows and evaluate against the wrong cells.
+     *
+     * @param formula formula copied from the source Commercial sheet
+     * @param offset  number of preamble rows dropped (0 → no-op)
+     * @return formula whose same-sheet row refs point at the normalized rows
+     */
+    private String shiftCommercialRowRefs(String formula, int offset) {
+        if (formula == null || formula.isEmpty() || offset <= 0) return formula;
+        Matcher m = COMMERCIAL_ROW_REF.matcher(formula);
+        StringBuilder sb = new StringBuilder();
+        int last = 0;
+        while (m.find()) {
+            String repl = m.group(0);
+            if (repl.indexOf('!') < 0) {
+                // same-sheet ref or range — shift row endpoints that sit
+                // below the dropped preamble
+                int r1 = Integer.parseInt(m.group(3));
+                repl = m.group(1) + m.group(2) + ((r1 - 1 >= offset) ? r1 - offset : r1);
+                if (m.group(5) != null) {                       // range second endpoint
+                    int r2 = Integer.parseInt(m.group(7));
+                    repl += ":" + m.group(4) + m.group(5) + m.group(6)
+                            + ((r2 - 1 >= offset) ? r2 - offset : r2);
+                }
+            }
+            sb.append(formula, last, m.start()).append(repl);
+            last = m.end();
+        }
+        sb.append(formula, last, formula.length());
+        return sb.toString();
+    }
+
     /**
      * Copies Commercial dropping leading non-key preamble rows so that
      * "Project Name" lands at row 0 exactly like the Sydney SoftDev layout.
@@ -556,8 +612,14 @@ public class GeneralizedTimesheetTransformer {
                 // Defect 7.3: shift Summary column refs (≥ J) so e.g.
                 // =SUM(Summary!J3:J8) still targets Total Amount after the
                 // Travel Expense column is inserted (J -> K).
+                // Defects 7.4/7.7: shift unqualified (same-sheet) ROW refs by
+                // the stripped preamble offset, so the header links (PO Amount
+                // =B7, PO Balance =D21) and the invoicing running-balance chain
+                // (=D22-C21, base =B19-C26) keep pointing at the same logical
+                // rows after the preamble rows are removed.
                 if (outCell.getCellType() == CellType.FORMULA && outCell.getCellFormula() != null) {
                     String shifted = shiftSummaryColumnRefs(outCell.getCellFormula(), false);
+                    shifted = shiftCommercialRowRefs(shifted, offset);
                     if (!shifted.equals(outCell.getCellFormula())) {
                         outCell.setCellFormula(shifted);
                     }

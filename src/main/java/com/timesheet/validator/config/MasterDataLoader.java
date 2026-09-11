@@ -28,6 +28,7 @@ public class MasterDataLoader implements ApplicationRunner {
     private final RoleRepository          roleRepo;
     private final AppUserRepository       userRepo;
     private final SowMasterRepository     sowRepo;
+    private final SowPoRepository         sowPoRepo;
     private final ResourceSowRepository   resourceSowRepo;
     private final PasswordEncoder         passwordEncoder;
 
@@ -113,6 +114,19 @@ public class MasterDataLoader implements ApplicationRunner {
                 .active(sp.isActive())
                 .build();
             sowRepo.save(sow);
+
+            // Seed additional POs for this SOW (SOW_PO supports the sheet
+            // layout where each resource row carries its own PO number and
+            // the Commercial header carries the primary one).
+            if (sp.getPoNumbers() != null) {
+                for (String extraPo : sp.getPoNumbers()) {
+                    if (extraPo == null || extraPo.isBlank()) continue;
+                    sowPoRepo.save(SowPo.builder()
+                        .sowNumber(sp.getSowNumber())
+                        .poNumber(extraPo.trim())
+                        .build());
+                }
+            }
 
             // Seed resource-SOW mappings
             if (sp.getResourceIds() != null) {

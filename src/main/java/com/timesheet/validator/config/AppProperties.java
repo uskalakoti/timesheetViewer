@@ -28,6 +28,10 @@ public class AppProperties {
     public static class SowProps {
         private String     sowNumber;
         private String     poNumber;
+        /** Additional PO numbers registered under this SOW (SOW_PO).
+         *  The Commercial header carries the primary {@link #poNumber};
+         *  per-resource Summary rows may reference any of these. */
+        private List<String> poNumbers = new ArrayList<>();
         private BigDecimal poValue;
         private String     client;
         private String     description;

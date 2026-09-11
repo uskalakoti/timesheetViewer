@@ -57,13 +57,13 @@ class ExcelViewerApplicationTests {
     }
 
     @Test
-    @DisplayName("All 18 resources seeded from application.yml")
+    @DisplayName("All 6 resources seeded from application.yml")
     void resourcesSeeded() {
-        assertThat(resourceRepo.count()).isEqualTo(18);
-        // Use names as defined in application.yml
-        assertThat(resourceRepo.findByName("Harpreet Singh Gulati")).isPresent();
-        assertThat(resourceRepo.findByName("Umesh Singh Kalakoti")).isPresent();
-        assertThat(resourceRepo.findByName("AKK")).isPresent();
+        assertThat(resourceRepo.count()).isEqualTo(6);
+        // Use names as defined in application.yml (SOW_19_2026 roster)
+        assertThat(resourceRepo.findByName("Deepa Malik")).isPresent();
+        assertThat(resourceRepo.findByName("Gaurav Kumar")).isPresent();
+        assertThat(resourceRepo.findByName("Monthly on call Support")).isPresent();
     }
 
     @Test
@@ -91,7 +91,7 @@ class ExcelViewerApplicationTests {
     void validationConfigLoads() {
         AppProperties.ValidationProps v = props.getValidation();
         assertThat(v.getMaxHoursPerDay()).isEqualTo(8.0);
-        assertThat(v.getExpectedSow()).isEqualTo("SOW_18_2026");
+        assertThat(v.getExpectedSow()).isEqualTo("SOW_19_2026");
         assertThat(v.getWeekendOverrideReasons()).isNotEmpty();
     }
 

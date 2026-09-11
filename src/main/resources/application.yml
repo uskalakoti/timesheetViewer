@@ -260,8 +260,16 @@ app:
 #          - RES-017
 #          - RES-018
       - sowNumber: SOW_19_2026
-#        poNumber: '1234567897'
-        poValue: 3500000
+        poNumber: '1234567897'
+        # Per-resource POs used in the Summary sheet rows (SOW_PO)
+        poNumbers:
+          - '1234567890'
+          - '1234567891'
+          - '1234567892'
+          - '1234567893'
+          - '1234567894'
+          - '1234567895'
+        poValue: 100000
         client: IGT
         description: IATA TIMATIC - Maintenance and Support Services
         startDate: "2026-04-01"
@@ -286,9 +294,6 @@ app:
 #            name: Gaurav Kumar
 
 
-      - sowNumber: Net Jun billable amount
-        poValue: 3500000
-        client: IGT
 
     # Public holidays — add/remove entries and restart
     holidays:
@@ -466,3 +471,18 @@ app:
         - "Critical deadline — pre-approved by manager"
         - "Go-live weekend support"
         - "Other — see task description"
+
+  commercial:
+    # ── Defect 7.5 — TEMPORARY hardcoded Commercial Sheet test data ──────────
+    # Until dynamic data mapping is implemented, blank Commercial header
+    # fields (PO Number, PO Value, Total Billable Headcount) are populated
+    # with these predefined test values so Commercial validations and UI
+    # functionality can be tested independently. Only blank cells are
+    # filled — uploaded values always win. Testing environments only:
+    # set enabled: false (or remove the values) once integration with the
+    # source systems is completed.
+    test-data:
+      enabled: true
+      po-number: "1234567897"
+      po-value: 100000
+      total-billable-headcount: 4.5
